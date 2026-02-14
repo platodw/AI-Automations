@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await ensureDatabase();
     const body = await req.json();
 
     if (typeof body !== 'object' || !body) {
