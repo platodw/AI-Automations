@@ -1,5 +1,17 @@
 import { sql } from '@vercel/postgres';
 
+let dbInitialized = false;
+
+export async function ensureDatabase() {
+  if (dbInitialized) return;
+  try {
+    await initializeDatabase();
+    dbInitialized = true;
+  } catch {
+    // DB may not be configured yet — skip silently
+  }
+}
+
 export async function initializeDatabase() {
   await sql`
     CREATE TABLE IF NOT EXISTS digests (

@@ -19,6 +19,7 @@ export default function ConfigPage() {
   const [config, setConfig] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -29,15 +30,18 @@ export default function ConfigPage() {
       const res = await fetch('/api/config');
       if (res.ok) {
         setConfig(await res.json());
+      } else {
+        setError('Failed to load configuration.');
       }
     } catch {
-      // Ignore
+      setError('Failed to connect. Check your network connection.');
     }
   };
 
   const saveConfig = async (updates: Record<string, string>) => {
     setSaving(true);
     setSaved(false);
+    setError(null);
     try {
       const res = await fetch('/api/config', {
         method: 'POST',
@@ -48,9 +52,11 @@ export default function ConfigPage() {
         setConfig((prev) => ({ ...prev, ...updates }));
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+      } else {
+        setError('Failed to save configuration.');
       }
     } catch {
-      // Ignore
+      setError('Failed to connect. Check your network connection.');
     } finally {
       setSaving(false);
     }
@@ -68,6 +74,12 @@ export default function ConfigPage() {
           <h1 className="text-2xl font-bold text-gray-900">Configuration</h1>
           {saved && <span className="text-green-600 text-sm font-medium">Saved!</span>}
         </div>
+
+        {error && (
+          <div className="p-4 rounded-lg mb-6 bg-red-50 text-red-800">
+            {error}
+          </div>
+        )}
 
         {/* Section Toggles */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">

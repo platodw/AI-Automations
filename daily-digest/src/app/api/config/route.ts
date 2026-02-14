@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllConfig, setConfig } from '@/lib/db';
+import { getAllConfig, setConfig, ensureDatabase } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const session = req.cookies.get('digest_session');
@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    await ensureDatabase();
     const config = await getAllConfig();
     return NextResponse.json(config);
   } catch (error) {

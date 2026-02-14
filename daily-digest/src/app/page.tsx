@@ -19,6 +19,7 @@ export default function HomePage() {
   const [sendResult, setSendResult] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHistory();
@@ -64,14 +65,17 @@ export default function HomePage() {
 
   const loadPreview = async () => {
     setLoadingPreview(true);
+    setError(null);
     try {
       const res = await fetch('/api/digest');
       if (res.ok) {
         const data = await res.json();
         setPreviewHtml(data.html);
+      } else {
+        setError('Failed to load preview. Please try again.');
       }
     } catch {
-      // Ignore
+      setError('Failed to connect. Check your network connection.');
     } finally {
       setLoadingPreview(false);
     }
@@ -124,6 +128,12 @@ export default function HomePage() {
         {sendResult && (
           <div className={`p-4 rounded-lg mb-6 ${sendResult.includes('success') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
             {sendResult}
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4 rounded-lg mb-6 bg-red-50 text-red-800">
+            {error}
           </div>
         )}
 

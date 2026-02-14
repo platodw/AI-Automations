@@ -96,7 +96,7 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
     const record = data.team?.record?.items?.[0]?.summary;
 
     return { name: team.name, lastGame, nextGame, record };
-  } catch (error) {
+  } catch {
     // Try the scoreboard endpoint as fallback
     try {
       const sportPath = team.sport === 'football'

@@ -17,6 +17,7 @@ export default function HistoryPage() {
   const [digests, setDigests] = useState<DigestRecord[]>([]);
   const [selectedDigest, setSelectedDigest] = useState<DigestRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDigests();
@@ -27,9 +28,11 @@ export default function HistoryPage() {
       const res = await fetch('/api/digest/history');
       if (res.ok) {
         setDigests(await res.json());
+      } else {
+        setError('Failed to load digest history.');
       }
     } catch {
-      // Ignore
+      setError('Failed to connect. Check your network connection.');
     } finally {
       setLoading(false);
     }
@@ -40,9 +43,11 @@ export default function HistoryPage() {
       const res = await fetch(`/api/digest/history?id=${id}`);
       if (res.ok) {
         setSelectedDigest(await res.json());
+      } else {
+        setError('Failed to load digest details.');
       }
     } catch {
-      // Ignore
+      setError('Failed to connect. Check your network connection.');
     }
   };
 
@@ -59,6 +64,12 @@ export default function HistoryPage() {
     <DashboardLayout>
       <div className="max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Digest History</h1>
+
+        {error && (
+          <div className="p-4 rounded-lg mb-6 bg-red-50 text-red-800">
+            {error}
+          </div>
+        )}
 
         {loading ? (
           <p className="text-gray-500">Loading...</p>

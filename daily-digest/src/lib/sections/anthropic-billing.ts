@@ -1,14 +1,6 @@
 import { withRetry } from '@/lib/retry';
 import { format, subDays, startOfWeek } from 'date-fns';
 
-interface UsageEntry {
-  date: string;
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  cost: number;
-}
-
 interface BillingData {
   daily: {
     date: string;

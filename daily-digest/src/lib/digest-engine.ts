@@ -1,4 +1,4 @@
-import { getLastDigestTimestamp, getAllConfig, saveDigest, saveDigestLog } from '@/lib/db';
+import { getLastDigestTimestamp, getAllConfig, saveDigest, saveDigestLog, ensureDatabase } from '@/lib/db';
 import { fetchEmails, sendDigestEmail } from '@/lib/sections/gmail';
 import { fetchCalendarEvents } from '@/lib/sections/calendar';
 import { fetchWeather } from '@/lib/sections/weather';
@@ -48,6 +48,7 @@ export async function compileAndSendDigest(): Promise<{
   executionTimeMs: number;
 }> {
   const overallStart = Date.now();
+  await ensureDatabase();
 
   // Get configuration
   const config = await getAllConfig();
@@ -175,6 +176,7 @@ export async function compileAndSendDigest(): Promise<{
 }
 
 export async function previewDigest(): Promise<{ html: string; content: Record<string, any> }> {
+  await ensureDatabase();
   const config = await getAllConfig();
   const lastDigest = await getLastDigestTimestamp();
   const sinceTimestamp = lastDigest || subHours(new Date(), 24);

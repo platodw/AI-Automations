@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRecentDigests, getDigestById } from '@/lib/db';
+import { getRecentDigests, getDigestById, ensureDatabase } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const session = req.cookies.get('digest_session');
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
 
   try {
+    await ensureDatabase();
     if (id) {
       const digest = await getDigestById(parseInt(id));
       if (!digest) {

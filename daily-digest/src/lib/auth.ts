@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 
 const SESSION_COOKIE = 'digest_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -9,7 +10,21 @@ export function getPassword(): string {
 }
 
 export async function verifyPassword(password: string): Promise<boolean> {
-  return password === getPassword();
+  const stored = getPassword();
+  // Support both bcrypt hashes and plain-text passwords for backwards compatibility
+  if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
+    return bcrypt.compare(password, stored);
+  }
+  // Constant-time comparison for plain-text passwords
+  const encoder = new TextEncoder();
+  const a = encoder.encode(password);
+  const b = encoder.encode(stored);
+  if (a.byteLength !== b.byteLength) return false;
+  let result = 0;
+  for (let i = 0; i < a.byteLength; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
 }
 
 export async function createSession(): Promise<string> {
