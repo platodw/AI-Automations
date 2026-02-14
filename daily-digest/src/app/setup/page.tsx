@@ -124,24 +124,28 @@ export default function SetupPage() {
     },
     {
       id: 'reddit',
-      title: '3. Reddit API Setup',
+      title: '3. Reddit Feed',
       content: (
         <div className="space-y-4">
+          <div className="bg-green-50 rounded-lg p-4 text-sm text-green-800">
+            <p className="font-semibold mb-2">No API keys needed!</p>
+            <p>Reddit feeds use public JSON endpoints, so no account or API credentials are required.</p>
+          </div>
+
           <div className="bg-orange-50 rounded-lg p-4 text-sm text-orange-800">
-            <p className="font-semibold mb-2">Create Reddit Application:</p>
+            <p className="font-semibold mb-2">Configure your subreddits:</p>
             <ol className="list-decimal list-inside space-y-1">
-              <li>Go to <a href="https://www.reddit.com/prefs/apps" className="underline" target="_blank" rel="noopener noreferrer">Reddit App Preferences</a></li>
-              <li>Scroll down and click &quot;create another app...&quot;</li>
-              <li>Select &quot;script&quot; as the application type</li>
-              <li>Name it &quot;Daily Digest&quot;</li>
-              <li>Set redirect URI to <code className="bg-orange-100 px-1 rounded">https://your-domain.vercel.app</code></li>
-              <li>Copy the Client ID (below app name) and Secret</li>
+              <li>Deploy your app and log in to the dashboard</li>
+              <li>Go to the <strong>Config</strong> page</li>
+              <li>Find the <strong>Reddit Subreddits</strong> field</li>
+              <li>Enter a comma-separated list of subreddits (e.g. <code className="bg-orange-100 px-1 rounded">technology, programming, golf</code>)</li>
+              <li>The digest will include the top posts from each subreddit</li>
             </ol>
           </div>
 
-          <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg font-mono">
-            REDDIT_CLIENT_ID=your_client_id<br />
-            REDDIT_CLIENT_SECRET=your_client_secret
+          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+            <p className="font-semibold text-gray-700 mb-1">Default subreddits:</p>
+            <p>technology, programming, worldnews</p>
           </div>
         </div>
       ),
@@ -234,9 +238,7 @@ ALPHA_VANTAGE_API_KEY=...
 DISCORD_BOT_TOKEN=...
 DISCORD_GUILD_ID=...
 
-# Reddit
-REDDIT_CLIENT_ID=...
-REDDIT_CLIENT_SECRET=...
+# Reddit - no API keys needed (uses public feeds)
 
 # App
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
