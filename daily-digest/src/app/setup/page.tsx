@@ -75,6 +75,13 @@ export default function SetupPage() {
               >
                 {connectingGoogle === 'dan@danplato.com' ? 'Connecting...' : 'Connect dan@danplato.com'}
               </button>
+              <button
+                onClick={() => connectGoogle('dan@narrativemoney.com')}
+                disabled={connectingGoogle !== null}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 disabled:opacity-50"
+              >
+                {connectingGoogle === 'dan@narrativemoney.com' ? 'Connecting...' : 'Connect dan@narrativemoney.com'}
+              </button>
             </div>
           </div>
 
