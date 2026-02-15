@@ -2,7 +2,9 @@ import { withRetry } from '@/lib/retry';
 
 interface GameScore {
   homeTeam: string;
+  homeTeamId: string;
   awayTeam: string;
+  awayTeamId: string;
   homeScore: number | null;
   awayScore: number | null;
   status: string;
@@ -12,6 +14,7 @@ interface GameScore {
 
 interface TeamData {
   name: string;
+  espnId: string;
   lastGame: GameScore | null;
   nextGame: GameScore | null;
   record?: string;
@@ -32,6 +35,28 @@ const TEAMS = [
   { name: 'SLU Billikens Basketball', espnId: '139', league: 'mens-college-basketball', sport: 'basketball', group: '50' },
   { name: 'SLU Billikens Soccer', espnId: '139', league: 'college-soccer', sport: 'soccer' },
 ];
+
+function parseScore(comp: any): number | null {
+  if (!comp) return null;
+  // ESPN score can be: comp.score (string), comp.score.value, or comp.score.displayValue
+  const raw = typeof comp.score === 'object'
+    ? (comp.score?.displayValue ?? comp.score?.value)
+    : comp.score;
+  if (raw === undefined || raw === null || raw === '') return null;
+  const num = parseInt(String(raw), 10);
+  return isNaN(num) ? null : num;
+}
+
+function formatDateET(date: Date): string {
+  return date.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+  });
+}
 
 async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamData> {
   try {
@@ -72,17 +97,13 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
 
       const game: GameScore = {
         homeTeam: homeComp?.team?.displayName || homeComp?.team?.name || 'TBD',
+        homeTeamId: String(homeComp?.team?.id || ''),
         awayTeam: awayComp?.team?.displayName || awayComp?.team?.name || 'TBD',
-        homeScore: competitions.status?.type?.completed ? parseInt(homeComp?.score || '0') : null,
-        awayScore: competitions.status?.type?.completed ? parseInt(awayComp?.score || '0') : null,
+        awayTeamId: String(awayComp?.team?.id || ''),
+        homeScore: competitions.status?.type?.completed ? parseScore(homeComp) : null,
+        awayScore: competitions.status?.type?.completed ? parseScore(awayComp) : null,
         status: competitions.status?.type?.shortDetail || event.status?.type?.shortDetail || 'Scheduled',
-        date: eventDate.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-        }),
+        date: formatDateET(eventDate),
         league: team.league,
       };
 
@@ -95,7 +116,7 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
 
     const record = data.team?.record?.items?.[0]?.summary;
 
-    return { name: team.name, lastGame, nextGame, record };
+    return { name: team.name, espnId: team.espnId, lastGame, nextGame, record };
   } catch {
     // Try the scoreboard endpoint as fallback
     try {
@@ -112,7 +133,7 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
         const data = await res.json();
         const teamEvent = data.events?.find((e: any) =>
           e.competitions?.[0]?.competitors?.some(
-            (c: any) => c.team?.id === team.espnId
+            (c: any) => String(c.team?.id) === team.espnId
           )
         );
 
@@ -123,13 +144,16 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
 
           return {
             name: team.name,
+            espnId: team.espnId,
             lastGame: {
               homeTeam: homeComp?.team?.displayName || 'TBD',
+              homeTeamId: String(homeComp?.team?.id || ''),
               awayTeam: awayComp?.team?.displayName || 'TBD',
-              homeScore: parseInt(homeComp?.score || '0'),
-              awayScore: parseInt(awayComp?.score || '0'),
+              awayTeamId: String(awayComp?.team?.id || ''),
+              homeScore: parseScore(homeComp),
+              awayScore: parseScore(awayComp),
               status: competitions.status?.type?.shortDetail || 'Final',
-              date: new Date(teamEvent.date).toLocaleDateString('en-US'),
+              date: formatDateET(new Date(teamEvent.date)),
               league: team.league,
             },
             nextGame: null,
@@ -142,6 +166,7 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
 
     return {
       name: team.name,
+      espnId: team.espnId,
       lastGame: null,
       nextGame: null,
     };
@@ -161,7 +186,7 @@ export async function fetchSports(): Promise<SportsData> {
       teams.push(result.value);
     } else {
       errors.push(`${TEAMS[i].name}: ${result.reason}`);
-      teams.push({ name: TEAMS[i].name, lastGame: null, nextGame: null });
+      teams.push({ name: TEAMS[i].name, espnId: TEAMS[i].espnId, lastGame: null, nextGame: null });
     }
   }
 

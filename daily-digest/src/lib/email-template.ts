@@ -286,29 +286,41 @@ function renderNews(data: any): string {
   return html;
 }
 
+function isOurTeam(game: any, team: any): boolean {
+  // Match by ESPN team ID
+  const espnId = team.espnId;
+  if (espnId) {
+    if (String(game.homeTeamId) === String(espnId)) return true;
+    if (String(game.awayTeamId) === String(espnId)) return false;
+  }
+  // Fallback: we default to checking if it's home
+  return true;
+}
+
 function formatGameSummary(team: any): string | null {
   const parts: string[] = [];
 
   if (team.lastGame) {
     const g = team.lastGame;
-    const isHome = g.homeTeam.toLowerCase().includes(team.name.split(' ').pop()?.toLowerCase() || '');
+    const isHome = isOurTeam(g, team);
     const teamScore = isHome ? g.homeScore : g.awayScore;
     const oppScore = isHome ? g.awayScore : g.homeScore;
     const opponent = isHome ? g.awayTeam : g.homeTeam;
-    const location = isHome ? 'vs' : 'at';
 
-    if (teamScore !== null && oppScore !== null) {
+    if (teamScore !== null && oppScore !== null && !isNaN(teamScore) && !isNaN(oppScore)) {
       const won = teamScore > oppScore;
       const verb = won ? 'defeated' : 'fell to';
-      parts.push(`${verb} ${opponent} ${Math.max(teamScore, oppScore)}-${Math.min(teamScore, oppScore)} ${location === 'at' ? `on the road` : `at home`}`);
+      const winScore = Math.max(teamScore, oppScore);
+      const loseScore = Math.min(teamScore, oppScore);
+      parts.push(`${verb} ${opponent} ${winScore}-${loseScore}${isHome ? ' at home' : ' on the road'}`);
     } else {
-      parts.push(`played ${opponent} (${g.status})`);
+      parts.push(`${g.status} vs ${opponent}`);
     }
   }
 
   if (team.nextGame) {
     const g = team.nextGame;
-    const isHome = g.homeTeam.toLowerCase().includes(team.name.split(' ').pop()?.toLowerCase() || '');
+    const isHome = isOurTeam(g, team);
     const opponent = isHome ? g.awayTeam : g.homeTeam;
     const where = isHome ? 'host' : 'visit';
     parts.push(`Next up: ${where} ${opponent} on ${g.date}`);
