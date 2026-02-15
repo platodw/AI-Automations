@@ -323,6 +323,36 @@ export default function AutomationDetailPage() {
           </div>
         </div>
 
+        {/* Weather Settings */}
+        {automation.sections.weather && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Weather Configuration</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Weather Mode</label>
+              <div className="flex gap-2">
+                <select
+                  value={automation.settings.weather_mode || 'today'}
+                  onChange={(e) => {
+                    const newSettings = { ...automation.settings, weather_mode: e.target.value };
+                    setAutomation({ ...automation, settings: newSettings });
+                    saveField({ settings: newSettings });
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="today">Today&apos;s Weather — current conditions + hourly forecast</option>
+                  <option value="tomorrow">Tomorrow&apos;s Preview — next day forecast with comparison</option>
+                </select>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {(automation.settings.weather_mode || 'today') === 'tomorrow'
+                  ? 'Shows brief current conditions, then highlights tomorrow\'s high/low, conditions, and how it compares to today'
+                  : 'Shows current temperature, conditions, and 6-hour forecast'
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Reddit Settings */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Reddit Configuration</h2>

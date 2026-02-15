@@ -209,42 +209,135 @@ function renderCalendar(data: any): string {
   return html;
 }
 
-function renderWeather(data: any): string {
+function renderWeather(data: any, settings?: Record<string, string>): string {
   if (!data) return '';
 
-  let html = sectionHeader(`Weather — ${data.location}`, '🌤️');
+  const weatherMode = settings?.weather_mode || 'today';
 
-  html += `
-    <tr><td style="padding:8px 16px;">
-      <table style="width:100%;border-collapse:collapse;">
-        <tr>
-          <td style="font-size:36px;width:60px;text-align:center;">${weatherIcon(data.current.icon)}</td>
-          <td>
-            <p style="margin:0;font-size:28px;font-weight:700;color:#1e293b;">${data.current.temp}°F</p>
-            <p style="margin:0;font-size:13px;color:#64748b;">Feels like ${data.current.feelsLike}°F • ${data.current.description}</p>
-            <p style="margin:0;font-size:12px;color:#94a3b8;">💨 ${data.current.windSpeed} mph ${data.current.windDirection} • 💧 ${data.current.humidity}%</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  `;
+  let html = '';
 
-  // Hourly forecast
-  if (data.forecast?.length > 0) {
-    html += `<tr><td style="padding:8px 16px;overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:center;">
-        <tr style="background:#f8fafc;">
-          ${data.forecast.slice(0, 6).map((h: any) => `
-            <td style="padding:6px 4px;">
-              <div style="color:#64748b;">${h.time}</div>
-              <div style="font-size:16px;">${weatherIcon(h.icon)}</div>
-              <div style="font-weight:600;">${h.temp}°</div>
-              ${h.precipitation > 0 ? `<div style="color:#3b82f6;">💧${h.precipitation}%</div>` : ''}
+  if (weatherMode === 'tomorrow') {
+    // Tomorrow preview mode: show current conditions briefly, then focus on tomorrow
+    html += sectionHeader(`Weather — ${data.location}`, '🌤️');
+
+    // Brief current conditions
+    html += `
+      <tr><td style="padding:8px 16px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="font-size:28px;width:50px;text-align:center;">${weatherIcon(data.current.icon)}</td>
+            <td>
+              <p style="margin:0;font-size:14px;color:#64748b;">
+                <strong style="color:#1e293b;">Now:</strong> ${data.current.temp}°F (feels ${data.current.feelsLike}°F) • ${data.current.description}
+              </p>
             </td>
-          `).join('')}
-        </tr>
-      </table>
-    </td></tr>`;
+          </tr>
+        </table>
+      </td></tr>
+    `;
+
+    // Tomorrow's forecast — the main event
+    if (data.daily?.length >= 2) {
+      const tomorrow = data.daily[1];
+      html += `
+        <tr><td style="padding:12px 16px 4px;">
+          <p style="margin:0;font-size:16px;font-weight:700;color:#4f46e5;">Tomorrow — ${tomorrow.date}</p>
+        </td></tr>
+        <tr><td style="padding:4px 16px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tr>
+              <td style="font-size:36px;width:60px;text-align:center;">${weatherIcon(tomorrow.icon)}</td>
+              <td>
+                <p style="margin:0;font-size:24px;font-weight:700;color:#1e293b;">
+                  ${tomorrow.high}° <span style="color:#64748b;font-size:18px;font-weight:400;">/ ${tomorrow.low}°</span>
+                </p>
+                <p style="margin:0;font-size:14px;color:#64748b;">${tomorrow.description}</p>
+                ${tomorrow.precipitation > 0 ? `<p style="margin:2px 0 0;font-size:13px;color:#3b82f6;">💧 ${tomorrow.precipitation}% chance of rain</p>` : ''}
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+      `;
+
+      // Comparison with today
+      const today = data.daily[0];
+      if (today) {
+        const highDiff = tomorrow.high - today.high;
+        const lowDiff = tomorrow.low - today.low;
+        const diffDesc = [];
+        if (Math.abs(highDiff) >= 3) {
+          diffDesc.push(`${Math.abs(highDiff)}° ${highDiff > 0 ? 'warmer' : 'cooler'} high`);
+        }
+        if (Math.abs(lowDiff) >= 3) {
+          diffDesc.push(`${Math.abs(lowDiff)}° ${lowDiff > 0 ? 'warmer' : 'cooler'} low`);
+        }
+
+        if (diffDesc.length > 0) {
+          html += `<tr><td style="padding:4px 16px;">
+            <p style="margin:0;font-size:13px;color:#94a3b8;font-style:italic;">
+              vs. today: ${diffDesc.join(', ')}
+            </p>
+          </td></tr>`;
+        }
+      }
+    }
+
+    // Rest of week
+    if (data.daily?.length > 2) {
+      html += `<tr><td style="padding:12px 16px 4px;">
+        <p style="margin:0;font-size:13px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Rest of Week</p>
+      </td></tr>`;
+      html += `<tr><td style="padding:4px 16px;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:center;">
+          <tr style="background:#f8fafc;">
+            ${data.daily.slice(2, 5).map((d: any) => `
+              <td style="padding:8px 6px;">
+                <div style="color:#64748b;font-weight:600;">${d.date}</div>
+                <div style="font-size:18px;margin:2px 0;">${weatherIcon(d.icon)}</div>
+                <div style="font-weight:600;">${d.high}° <span style="color:#94a3b8;font-weight:400;">/ ${d.low}°</span></div>
+                ${d.precipitation > 0 ? `<div style="color:#3b82f6;">💧${d.precipitation}%</div>` : ''}
+              </td>
+            `).join('')}
+          </tr>
+        </table>
+      </td></tr>`;
+    }
+  } else {
+    // Default today mode: current conditions + hourly forecast
+    html += sectionHeader(`Weather — ${data.location}`, '🌤️');
+
+    html += `
+      <tr><td style="padding:8px 16px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="font-size:36px;width:60px;text-align:center;">${weatherIcon(data.current.icon)}</td>
+            <td>
+              <p style="margin:0;font-size:28px;font-weight:700;color:#1e293b;">${data.current.temp}°F</p>
+              <p style="margin:0;font-size:13px;color:#64748b;">Feels like ${data.current.feelsLike}°F • ${data.current.description}</p>
+              <p style="margin:0;font-size:12px;color:#94a3b8;">💨 ${data.current.windSpeed} mph ${data.current.windDirection} • 💧 ${data.current.humidity}%</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    `;
+
+    // Hourly forecast
+    if (data.forecast?.length > 0) {
+      html += `<tr><td style="padding:8px 16px;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:center;">
+          <tr style="background:#f8fafc;">
+            ${data.forecast.slice(0, 6).map((h: any) => `
+              <td style="padding:6px 4px;">
+                <div style="color:#64748b;">${h.time}</div>
+                <div style="font-size:16px;">${weatherIcon(h.icon)}</div>
+                <div style="font-weight:600;">${h.temp}°</div>
+                ${h.precipitation > 0 ? `<div style="color:#3b82f6;">💧${h.precipitation}%</div>` : ''}
+              </td>
+            `).join('')}
+          </tr>
+        </table>
+      </td></tr>`;
+    }
   }
 
   return html;
@@ -462,7 +555,7 @@ function renderReddit(data: any): string {
   return html;
 }
 
-export function generateDigestHtml(content: DigestContent, enabledSections: Record<string, boolean>, digestName: string = 'Morning Digest'): string {
+export function generateDigestHtml(content: DigestContent, enabledSections: Record<string, boolean>, digestName: string = 'Morning Digest', settings?: Record<string, string>): string {
   const now = new Date();
   const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const dateStr = format(nowET, 'EEEE, MMMM d, yyyy');
@@ -472,7 +565,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
   const errors = content.errors || {};
 
   const sectionRenderers: Array<{ key: string; render: () => string }> = [
-    { key: 'weather', render: () => errors.weather ? errorSection('Weather', errors.weather) : renderWeather(content.weather) },
+    { key: 'weather', render: () => errors.weather ? errorSection('Weather', errors.weather) : renderWeather(content.weather, settings) },
     { key: 'calendar', render: () => errors.calendar ? errorSection('Calendar', errors.calendar) : renderCalendar(content.calendar) },
     { key: 'emails', render: () => errors.emails ? errorSection('Emails', errors.emails) : renderEmails(content.emails) },
     { key: 'stocks', render: () => errors.stocks ? errorSection('Stocks', errors.stocks) : renderStocks(content.stocks) },

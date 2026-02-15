@@ -201,7 +201,7 @@ export async function compileAndSendDigest(automation: Automation): Promise<{
 
   // Generate email HTML
   const digestName = automation.name;
-  const html = generateDigestHtml(content, enabledSections, digestName);
+  const html = generateDigestHtml(content, enabledSections, digestName, automation.settings);
   const subject = `☀️ ${digestName} — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
 
   // Send email
@@ -325,6 +325,6 @@ export async function previewDigest(automation: Automation): Promise<{ html: str
   content.errors = errors;
 
   const digestName = automation.name;
-  const html = generateDigestHtml(content, enabledSections, digestName);
+  const html = generateDigestHtml(content, enabledSections, digestName, automation.settings);
   return { html, content };
 }
