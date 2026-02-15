@@ -11,7 +11,6 @@ const SECTIONS = [
   { key: 'news', label: 'News & Trends', desc: 'Top headlines and trending topics' },
   { key: 'sports', label: 'Sports Scores', desc: 'Cleveland + Ohio State + SLU teams' },
   { key: 'anthropicBilling', label: 'Anthropic Billing', desc: 'Daily API usage (weekly on Fridays)' },
-  { key: 'discord', label: 'Discord GSPro', desc: 'GSPro updates from Discord' },
   { key: 'reddit', label: 'Reddit Feed', desc: 'Top posts from monitored subreddits' },
 ];
 
@@ -212,7 +211,6 @@ export default function ConfigPage() {
               { key: 'OPENWEATHER_API_KEY', label: 'OpenWeatherMap' },
               { key: 'NEWSAPI_KEY', label: 'NewsAPI' },
               { key: 'ANTHROPIC_API_KEY', label: 'Anthropic' },
-              { key: 'DISCORD_BOT_TOKEN', label: 'Discord Bot' },
               { key: 'REDDIT_CLIENT_ID', label: 'Reddit' },
               { key: 'ALPHA_VANTAGE_API_KEY', label: 'Alpha Vantage' },
             ].map((item) => (

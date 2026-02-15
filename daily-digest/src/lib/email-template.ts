@@ -8,7 +8,6 @@ interface DigestContent {
   news?: any;
   sports?: any;
   anthropicBilling?: any;
-  discord?: any;
   reddit?: any;
   errors?: Record<string, string>;
   generatedAt?: string;
@@ -418,33 +417,6 @@ function renderAnthropicBilling(data: any): string {
   return html;
 }
 
-function renderDiscord(data: any): string {
-  if (!data) return '';
-
-  let html = sectionHeader(`Discord GSPro Updates (${data.messages.length})`, '💬');
-
-  if (data.messages.length === 0) {
-    html += `<tr><td style="padding:4px 16px;font-size:13px;color:#94a3b8;">No new GSPro updates since last digest</td></tr>`;
-  }
-
-  for (const msg of (data.messages || []).slice(0, 10)) {
-    html += `
-      <tr><td style="padding:4px 16px;border-left:3px solid #5865f2;">
-        <p style="margin:0;font-size:12px;color:#64748b;"><strong>${msg.author}</strong> in #${msg.channel} • ${new Date(msg.timestamp).toLocaleString()}</p>
-        <p style="margin:2px 0;font-size:13px;color:#1e293b;">${msg.content.substring(0, 300)}</p>
-      </td></tr>
-    `;
-  }
-
-  html += `<tr><td style="padding:2px 16px;font-size:11px;color:#cbd5e1;">Monitoring: ${data.channelsMonitored.join(', ')}</td></tr>`;
-
-  if (data.error) {
-    html += errorSection('Discord', data.error);
-  }
-
-  return html;
-}
-
 function renderReddit(data: any): string {
   if (!data) return '';
 
@@ -509,7 +481,6 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
     { key: 'news', render: () => errors.news ? errorSection('News', errors.news) : renderNews(content.news) },
     { key: 'sports', render: () => errors.sports ? errorSection('Sports', errors.sports) : renderSports(content.sports) },
     { key: 'anthropicBilling', render: () => errors.anthropicBilling ? errorSection('Anthropic Billing', errors.anthropicBilling) : renderAnthropicBilling(content.anthropicBilling) },
-    { key: 'discord', render: () => errors.discord ? errorSection('Discord', errors.discord) : renderDiscord(content.discord) },
     { key: 'reddit', render: () => errors.reddit ? errorSection('Reddit', errors.reddit) : renderReddit(content.reddit) },
   ];
 

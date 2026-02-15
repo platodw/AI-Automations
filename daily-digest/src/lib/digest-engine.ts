@@ -6,7 +6,6 @@ import { fetchStocks } from '@/lib/sections/stocks';
 import { fetchNews } from '@/lib/sections/news';
 import { fetchSports } from '@/lib/sections/sports';
 import { fetchAnthropicBilling } from '@/lib/sections/anthropic-billing';
-import { fetchDiscordUpdates } from '@/lib/sections/discord';
 import { fetchReddit } from '@/lib/sections/reddit';
 import { summarizeEmails } from '@/lib/sections/ai-summarizer';
 import { summarizeSports } from '@/lib/sections/sports-summarizer';
@@ -71,7 +70,6 @@ export async function compileAndSendDigest(): Promise<{
     news: config.section_news !== 'false',
     sports: config.section_sports !== 'false',
     anthropicBilling: config.section_anthropicBilling !== 'false',
-    discord: config.section_discord !== 'false',
     reddit: config.section_reddit !== 'false',
   };
 
@@ -102,11 +100,6 @@ export async function compileAndSendDigest(): Promise<{
   if (enabledSections.anthropicBilling) {
     sectionPromises.push(
       fetchSection('anthropicBilling', () => fetchAnthropicBilling(isFriday))
-    );
-  }
-  if (enabledSections.discord) {
-    sectionPromises.push(
-      fetchSection('discord', () => fetchDiscordUpdates(sinceTimestamp))
     );
   }
   if (enabledSections.reddit) {
@@ -258,7 +251,6 @@ export async function previewDigest(): Promise<{ html: string; content: Record<s
     news: config.section_news !== 'false',
     sports: config.section_sports !== 'false',
     anthropicBilling: config.section_anthropicBilling !== 'false',
-    discord: config.section_discord !== 'false',
     reddit: config.section_reddit !== 'false',
   };
 
@@ -273,7 +265,6 @@ export async function previewDigest(): Promise<{ html: string; content: Record<s
     news: () => fetchNews(),
     sports: () => fetchSports(),
     anthropicBilling: () => fetchAnthropicBilling(isFriday),
-    discord: () => fetchDiscordUpdates(sinceTimestamp),
     reddit: () => fetchReddit(sinceTimestamp),
   };
 
