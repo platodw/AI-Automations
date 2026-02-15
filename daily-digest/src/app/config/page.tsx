@@ -6,7 +6,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 const SECTIONS = [
   { key: 'emails', label: 'Email Summaries', desc: 'Unread emails from Gmail accounts' },
   { key: 'calendar', label: 'Calendar Events', desc: 'Today and tomorrow events' },
-  { key: 'weather', label: 'Weather', desc: 'Highland Heights, OH forecast' },
+  { key: 'weather', label: 'Weather', desc: 'Lyndhurst, OH forecast' },
   { key: 'stocks', label: 'Stock Market', desc: 'S&P 500, Dow, Nasdaq' },
   { key: 'news', label: 'News & Trends', desc: 'Top headlines and trending topics' },
   { key: 'sports', label: 'Sports Scores', desc: 'Cleveland + Ohio State + SLU teams' },
@@ -132,6 +132,25 @@ export default function ConfigPage() {
                   Save
                 </button>
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time (Eastern Time)</label>
+              <div className="flex gap-2">
+                <input
+                  type="time"
+                  value={config.delivery_time || '06:30'}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, delivery_time: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <button
+                  onClick={() => saveConfig({ delivery_time: config.delivery_time || '06:30' })}
+                  disabled={saving}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Default: 6:30 AM ET. The digest will be sent within 15 minutes of this time.</p>
             </div>
           </div>
         </div>

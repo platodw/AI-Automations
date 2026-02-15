@@ -40,7 +40,7 @@ Body:
 ${bodyPreview}`;
   }).join('\n\n');
 
-  const prompt = `You are summarizing emails for a daily digest. For each important email, provide:
+  const prompt = `You are summarizing emails for a morning digest. For each important email, provide:
 1. A brief 1-2 sentence summary of the key points
 2. Any action items that require follow-up
 

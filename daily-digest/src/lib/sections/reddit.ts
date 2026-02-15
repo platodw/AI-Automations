@@ -84,7 +84,7 @@ async function fetchSubredditPosts(
     async () => {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'DailyDigest/1.0 (RSS Reader)',
+          'User-Agent': 'MorningDigest/1.0 (RSS Reader)',
           Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
         },
       });

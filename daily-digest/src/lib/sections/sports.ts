@@ -92,7 +92,7 @@ async function fetchTeamHeadlines(team: typeof TEAMS[number]): Promise<string[]>
     const sportPath = getSportPath(team);
     const url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/news?team=${team.espnId}&limit=3`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'DailyDigest/1.0' },
+      headers: { 'User-Agent': 'MorningDigest/1.0' },
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -122,7 +122,7 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
     const data = await withRetry(
       async () => {
         const res = await fetch(url, {
-          headers: { 'User-Agent': 'DailyDigest/1.0' },
+          headers: { 'User-Agent': 'MorningDigest/1.0' },
         });
         if (!res.ok) throw new Error(`ESPN API error: ${res.status}`);
         return res.json();

@@ -25,7 +25,7 @@ async function fetchYahooQuote(symbol: string): Promise<any> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`;
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; DailyDigest/1.0)',
+      'User-Agent': 'Mozilla/5.0 (compatible; MorningDigest/1.0)',
     },
   });
   if (!res.ok) throw new Error(`Yahoo Finance error for ${symbol}: ${res.status}`);

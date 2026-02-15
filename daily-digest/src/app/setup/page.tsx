@@ -95,7 +95,7 @@ export default function SetupPage() {
             <p className="font-semibold mb-2">Create Discord Bot:</p>
             <ol className="list-decimal list-inside space-y-1">
               <li>Go to <a href="https://discord.com/developers/applications" className="underline" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a></li>
-              <li>Click &quot;New Application&quot; &rarr; name it &quot;Daily Digest Bot&quot;</li>
+              <li>Click &quot;New Application&quot; &rarr; name it &quot;Morning Digest Bot&quot;</li>
               <li>Go to Bot section &rarr; Click &quot;Add Bot&quot;</li>
               <li>Under Privileged Gateway Intents, enable &quot;Message Content Intent&quot;</li>
               <li>Copy the Bot Token to your environment variables</li>
@@ -171,7 +171,7 @@ export default function SetupPage() {
               <ol className="list-decimal list-inside space-y-1 text-xs text-gray-600">
                 <li>Sign up at <a href="https://newsapi.org/" className="underline text-indigo-600" target="_blank" rel="noopener noreferrer">newsapi.org</a></li>
                 <li>Go to Account and copy your API key</li>
-                <li>Free tier: 100 requests/day (sufficient for daily digest)</li>
+                <li>Free tier: 100 requests/day (sufficient for morning digest)</li>
               </ol>
               <code className="block mt-2 text-xs bg-white p-2 rounded text-gray-500">NEWSAPI_KEY=your_key</code>
             </div>
@@ -210,7 +210,7 @@ export default function SetupPage() {
               <li>Import the project in Vercel</li>
               <li>Add all environment variables in the Vercel dashboard</li>
               <li>Create a Vercel Postgres database in your project settings</li>
-              <li>The cron job is configured in vercel.json to run at 6:30 AM EST daily</li>
+              <li>The cron job runs every 30 min and sends at your configured delivery time (default 6:30 AM ET)</li>
               <li>After deploying, visit /api/health to verify all services</li>
               <li>Click &quot;Initialize Database&quot; on the dashboard to create tables</li>
               <li>Send a test digest to verify everything works</li>

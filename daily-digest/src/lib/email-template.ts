@@ -496,7 +496,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Digest — ${dateStr}</title>
+  <title>Morning Digest — ${dateStr}</title>
 </head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table role="presentation" style="width:100%;border-collapse:collapse;">
@@ -506,7 +506,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:28px 24px;text-align:center;">
-              <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">☀️ Daily Digest</h1>
+              <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">☀️ Morning Digest</h1>
               <p style="margin:6px 0 0;font-size:14px;color:#c7d2fe;">${dateStr}${isFriday ? ' • 🎉 TGIF' : ''}</p>
             </td>
           </tr>
@@ -524,7 +524,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
           <tr>
             <td style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e2e8f0;">
               <p style="margin:0;font-size:11px;color:#94a3b8;">
-                Generated at ${format(now, 'h:mm a')} EST • Daily Digest by Dan Plato
+                Generated at ${format(now, 'h:mm a')} EST • Morning Digest by Dan Plato
               </p>
             </td>
           </tr>

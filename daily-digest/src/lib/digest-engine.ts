@@ -209,7 +209,7 @@ export async function compileAndSendDigest(): Promise<{
 
   // Generate email HTML
   const html = generateDigestHtml(content, enabledSections);
-  const subject = `☀️ Daily Digest — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
+  const subject = `☀️ Morning Digest — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
 
   // Send email
   let sendError: string | null = null;
