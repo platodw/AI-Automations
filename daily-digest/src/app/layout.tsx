@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Daily Digest",
-  description: "Automated morning email digest dashboard",
+  title: "AI Automations",
+  description: "Personal AI automation dashboard",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

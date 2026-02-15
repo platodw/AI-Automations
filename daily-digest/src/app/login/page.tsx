@@ -38,8 +38,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">☀️</h1>
-          <h2 className="text-xl font-semibold text-gray-800 mt-2">Daily Digest</h2>
+          <h1 className="text-3xl font-bold text-gray-900">🤖</h1>
+          <h2 className="text-xl font-semibold text-gray-800 mt-2">AI Automations</h2>
           <p className="text-sm text-gray-500 mt-1">Enter your password to continue</p>
         </div>
 
