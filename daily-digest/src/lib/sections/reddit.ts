@@ -101,7 +101,7 @@ async function fetchSubredditPosts(
 export async function fetchReddit(sinceTimestamp: Date): Promise<RedditData> {
   const subredditConfig = await getConfig('reddit_subreddits');
   const subreddits = subredditConfig
-    ? subredditConfig.split(',').map((s) => s.trim()).filter(Boolean)
+    ? subredditConfig.split(',').map((s) => s.trim().replace(/^r\//, '')).filter(Boolean)
     : ['technology', 'programming', 'worldnews'];
 
   if (subreddits.length === 0) {
