@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "STBF Poshmark Cross-Lister",
+  "version": "1.0.0",
+  "description": "Cross-list items from STBF to Poshmark",
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://muhqtjlusrezcnhpstql.supabase.co/*",
+    "https://poshmark.com/*",
+    "https://*.lovable.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "STBF Poshmark Cross-Lister"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.lovable.app/*"],
+      "js": ["content-stbf.js"]
+    },
+    {
+      "matches": ["https://poshmark.com/create-listing*"],
+      "js": ["content-poshmark.js"]
+    }
+  ]
+}

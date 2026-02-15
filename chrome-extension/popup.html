@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 380px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fafafa;
+    }
+    .header {
+      background: #7b2d8e;
+      color: white;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .header .status-dot.on { background: #4caf50; }
+    .header .status-dot.off { background: #f44336; }
+    .section {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #555;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #7b2d8e;
+    }
+    .btn {
+      display: inline-block;
+      padding: 6px 14px;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-primary {
+      background: #7b2d8e;
+      color: white;
+    }
+    .btn-primary:hover { background: #6a2579; }
+    .btn-danger {
+      background: #e53935;
+      color: white;
+    }
+    .btn-danger:hover { background: #c62828; }
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .auth-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .auth-row input { flex: 1; }
+    .items-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .item-card {
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .item-card:last-child { border-bottom: none; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-title {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 13px;
+    }
+    .item-meta {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+    }
+    .item-price {
+      font-weight: 600;
+      color: #7b2d8e;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-size: 12px;
+    }
+    .error-msg {
+      color: #e53935;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+    .success-msg {
+      color: #4caf50;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+    #loading {
+      text-align: center;
+      padding: 16px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span>STBF → Poshmark</span>
+    <span id="auth-indicator">
+      <span class="status-dot off" id="status-dot"></span>
+      <span id="status-text">Not connected</span>
+    </span>
+  </div>
+
+  <div class="section" id="auth-section">
+    <div class="section-title">Authentication</div>
+    <p style="font-size:11px; color:#888; margin-bottom:6px;">
+      Paste your Supabase JWT from the STBF app console
+    </p>
+    <div class="auth-row">
+      <input type="text" id="token-input" placeholder="eyJhbGciOi..." />
+      <button class="btn btn-primary btn-sm" id="save-token-btn">Save</button>
+    </div>
+    <button class="btn btn-danger btn-sm" id="logout-btn" style="margin-top:8px; display:none;">Logout</button>
+    <div id="auth-message"></div>
+  </div>
+
+  <div class="section" id="items-section" style="display:none;">
+    <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>Pending Items</span>
+      <button class="btn btn-primary btn-sm" id="refresh-btn">Refresh</button>
+    </div>
+    <div id="loading" style="display:none;">Loading items...</div>
+    <div id="items-list" class="items-list"></div>
+    <div id="items-error"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
