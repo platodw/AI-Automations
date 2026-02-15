@@ -2,14 +2,20 @@ import { google } from 'googleapis';
 import { getOAuthTokens, saveOAuthTokens } from '@/lib/db';
 import { withRetry } from '@/lib/retry';
 
-const ACCOUNTS = ['platodw@gmail.com', 'dan@danplato.com'];
+const ACCOUNTS = ['platodw@gmail.com', 'dan@danplato.com', 'dan@narrativemoney.com'];
+
+// Per-account OAuth credentials for different Google Workspaces
+const ACCOUNT_CREDENTIALS: Record<string, { clientIdEnv: string; clientSecretEnv: string }> = {
+  'dan@danplato.com': { clientIdEnv: 'GOOGLE_CLIENT_ID_DAN', clientSecretEnv: 'GOOGLE_CLIENT_SECRET_DAN' },
+  'dan@narrativemoney.com': { clientIdEnv: 'GOOGLE_CLIENT_ID_NARRATIVE', clientSecretEnv: 'GOOGLE_CLIENT_SECRET_NARRATIVE' },
+};
 
 function getCredentialsForAccount(account: string) {
-  // dan@danplato.com uses its own Google Cloud project credentials
-  if (account === 'dan@danplato.com') {
+  const override = ACCOUNT_CREDENTIALS[account];
+  if (override) {
     return {
-      clientId: process.env.GOOGLE_CLIENT_ID_DAN || process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET_DAN || process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env[override.clientIdEnv] || process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env[override.clientSecretEnv] || process.env.GOOGLE_CLIENT_SECRET,
     };
   }
   // Default credentials (platodw@gmail.com)
