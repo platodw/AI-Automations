@@ -1,83 +1,80 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
+
+interface Automation {
+  id: number;
+  name: string;
+  delivery_time: string;
+  recipient_email: string;
+  enabled: boolean;
+  sections: Record<string, boolean>;
+  created_at: string;
+}
 
 interface DigestSummary {
   id: number;
   sent_at: string;
   status: string;
-  errors: Record<string, string> | null;
-  execution_time_ms: number;
-  recipient_email: string;
+  automation_name: string | null;
 }
 
 export default function HomePage() {
-  const [lastDigest, setLastDigest] = useState<DigestSummary | null>(null);
-  const [stats, setStats] = useState<{ total: number; successful: number; failed: number } | null>(null);
-  const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState<string | null>(null);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [recentDigests, setRecentDigests] = useState<DigestSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newTime, setNewTime] = useState('06:30');
+  const [newEmail, setNewEmail] = useState('platodw@gmail.com');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    fetchHistory();
+    fetchData();
   }, []);
 
-  const fetchHistory = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch('/api/digest/history');
-      if (res.ok) {
-        const digests = await res.json();
-        if (digests.length > 0) {
-          setLastDigest(digests[0]);
-          setStats({
-            total: digests.length,
-            successful: digests.filter((d: DigestSummary) => d.status === 'sent').length,
-            failed: digests.filter((d: DigestSummary) => d.status === 'error').length,
-          });
-        }
-      }
+      const [autoRes, histRes] = await Promise.all([
+        fetch('/api/automations'),
+        fetch('/api/digest/history'),
+      ]);
+      if (autoRes.ok) setAutomations(await autoRes.json());
+      if (histRes.ok) setRecentDigests(await histRes.json());
     } catch {
-      // Database may not be initialized yet
+      // Will show empty state
+    } finally {
+      setLoading(false);
     }
   };
 
-  const sendTestDigest = async () => {
-    setSending(true);
-    setSendResult(null);
+  const createAutomation = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
     try {
-      const res = await fetch('/api/digest', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setSendResult(`Digest #${data.digestId} sent successfully in ${(data.executionTimeMs / 1000).toFixed(1)}s`);
-        fetchHistory();
-      } else {
-        setSendResult(`Errors: ${JSON.stringify(data.errors)}`);
-      }
-    } catch (error) {
-      setSendResult(`Error: ${error instanceof Error ? error.message : 'Unknown'}`);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const loadPreview = async () => {
-    setLoadingPreview(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/digest');
+      const res = await fetch('/api/automations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          delivery_time: newTime,
+          recipient_email: newEmail,
+        }),
+      });
       if (res.ok) {
-        const data = await res.json();
-        setPreviewHtml(data.html);
-      } else {
-        setError('Failed to load preview. Please try again.');
+        const automation = await res.json();
+        setShowCreate(false);
+        setNewName('');
+        setNewTime('06:30');
+        router.push(`/automations/${automation.id}`);
       }
     } catch {
-      setError('Failed to connect. Check your network connection.');
+      // Error creating
     } finally {
-      setLoadingPreview(false);
+      setCreating(false);
     }
   };
 
@@ -86,114 +83,160 @@ export default function HomePage() {
       const res = await fetch('/api/init', { method: 'POST' });
       const data = await res.json();
       alert(data.success ? 'Database initialized!' : `Error: ${data.error}`);
+      fetchData();
     } catch (error) {
       alert(`Error: ${error}`);
+    }
+  };
+
+  const enabledCount = (sections: Record<string, boolean>) =>
+    Object.values(sections).filter(Boolean).length;
+
+  const statusColor = (status: string) => {
+    switch (status) {
+      case 'sent': return 'bg-green-100 text-green-700';
+      case 'partial': return 'bg-yellow-100 text-yellow-700';
+      case 'error': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
   return (
     <DashboardLayout>
       <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <button
-            onClick={sendTestDigest}
-            disabled={sending}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl p-4 text-left transition disabled:opacity-50"
-          >
-            <p className="font-semibold">{sending ? 'Sending...' : 'Send Test Digest'}</p>
-            <p className="text-sm text-indigo-200 mt-1">Send a digest right now</p>
-          </button>
-
-          <button
-            onClick={loadPreview}
-            disabled={loadingPreview}
-            className="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-4 text-left transition"
-          >
-            <p className="font-semibold text-gray-900">{loadingPreview ? 'Loading...' : 'Preview Digest'}</p>
-            <p className="text-sm text-gray-500 mt-1">Preview without sending</p>
-          </button>
-
-          <button
-            onClick={initDb}
-            className="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-4 text-left transition"
-          >
-            <p className="font-semibold text-gray-900">Initialize Database</p>
-            <p className="text-sm text-gray-500 mt-1">Create tables if needed</p>
-          </button>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Automations</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={initDb}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+            >
+              Init DB
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+            >
+              + New Automation
+            </button>
+          </div>
         </div>
 
-        {sendResult && (
-          <div className={`p-4 rounded-lg mb-6 ${sendResult.includes('success') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-            {sendResult}
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 rounded-lg mb-6 bg-red-50 text-red-800">
-            {error}
-          </div>
-        )}
-
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              <p className="text-sm text-gray-500">Total Digests</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <p className="text-2xl font-bold text-green-600">{stats.successful}</p>
-              <p className="text-sm text-gray-500">Successful</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
-              <p className="text-sm text-gray-500">Failed</p>
-            </div>
-          </div>
-        )}
-
-        {/* Last Digest */}
-        {lastDigest && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Last Digest</h2>
-            <div className="space-y-2 text-sm">
-              <p><span className="text-gray-500">Sent:</span> <span className="font-medium">{new Date(lastDigest.sent_at).toLocaleString()}</span></p>
-              <p><span className="text-gray-500">Status:</span> <span className={`font-medium ${lastDigest.status === 'sent' ? 'text-green-600' : lastDigest.status === 'partial' ? 'text-yellow-600' : 'text-red-600'}`}>{lastDigest.status}</span></p>
-              <p><span className="text-gray-500">Execution Time:</span> <span className="font-medium">{(lastDigest.execution_time_ms / 1000).toFixed(1)}s</span></p>
-              <p><span className="text-gray-500">Recipient:</span> <span className="font-medium">{lastDigest.recipient_email}</span></p>
-              {lastDigest.errors && Object.keys(lastDigest.errors).length > 0 && (
-                <div className="mt-2 p-3 bg-red-50 rounded-lg">
-                  <p className="font-medium text-red-800 mb-1">Errors:</p>
-                  {Object.entries(lastDigest.errors).map(([key, val]) => (
-                    <p key={key} className="text-red-600 text-xs">{key}: {val}</p>
-                  ))}
+        {/* Create Modal */}
+        {showCreate && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Create Automation</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Evening Summary"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    autoFocus
+                  />
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Time (ET)</label>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setShowCreate(false)}
+                  className="flex-1 px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createAutomation}
+                  disabled={creating || !newName.trim()}
+                  className="flex-1 px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+                >
+                  {creating ? 'Creating...' : 'Create'}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Preview */}
-        {previewHtml && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Digest Preview</h2>
-              <button
-                onClick={() => setPreviewHtml(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+        {loading ? (
+          <p className="text-gray-500">Loading...</p>
+        ) : automations.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <p className="text-gray-500 mb-4">No automations configured yet.</p>
+            <button
+              onClick={initDb}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+            >
+              Initialize Database
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {automations.map((auto) => (
+              <div
+                key={auto.id}
+                onClick={() => router.push(`/automations/${auto.id}`)}
+                className="bg-white rounded-xl border border-gray-200 p-5 hover:border-indigo-300 hover:shadow-sm transition cursor-pointer"
               >
-                &times;
-              </button>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2.5 h-2.5 rounded-full ${auto.enabled ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{auto.name}</h3>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        {auto.delivery_time} ET &bull; {auto.recipient_email} &bull; {enabledCount(auto.sections)} sections
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${auto.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {auto.enabled ? 'Active' : 'Paused'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Recent Activity */}
+        {recentDigests.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
+            <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+              {recentDigests.slice(0, 5).map((d) => (
+                <div key={d.id} className="px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {d.automation_name || 'Digest'} #{d.id}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(d.sent_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(d.status)}`}>
+                    {d.status}
+                  </span>
+                </div>
+              ))}
             </div>
-            <iframe
-              srcDoc={previewHtml}
-              className="w-full border-0"
-              style={{ height: '800px' }}
-              title="Digest Preview"
-            />
           </div>
         )}
       </div>

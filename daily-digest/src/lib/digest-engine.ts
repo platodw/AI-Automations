@@ -1,4 +1,4 @@
-import { getLastDigestTimestamp, getAllConfig, saveDigest, saveDigestLog, ensureDatabase } from '@/lib/db';
+import { getLastDigestTimestamp, saveDigest, saveDigestLog, ensureDatabase, type Automation } from '@/lib/db';
 import { fetchEmails, sendDigestEmail } from '@/lib/sections/gmail';
 import { fetchCalendarEvents } from '@/lib/sections/calendar';
 import { fetchWeather } from '@/lib/sections/weather';
@@ -44,7 +44,7 @@ async function fetchSection(
   }
 }
 
-export async function compileAndSendDigest(): Promise<{
+export async function compileAndSendDigest(automation: Automation): Promise<{
   success: boolean;
   digestId: number;
   errors: Record<string, string>;
@@ -53,25 +53,12 @@ export async function compileAndSendDigest(): Promise<{
   const overallStart = Date.now();
   await ensureDatabase();
 
-  // Get configuration
-  const config = await getAllConfig();
-  const recipientEmail = config.recipient_email || process.env.DIGEST_RECIPIENT_EMAIL || 'platodw@gmail.com';
+  const recipientEmail = automation.recipient_email;
+  const enabledSections = automation.sections;
 
   // Determine "since" timestamp
-  const lastDigest = await getLastDigestTimestamp();
+  const lastDigest = await getLastDigestTimestamp(automation.id);
   const sinceTimestamp = lastDigest || subHours(new Date(), 24);
-
-  // Determine enabled sections
-  const enabledSections: Record<string, boolean> = {
-    emails: config.section_emails !== 'false',
-    calendar: config.section_calendar !== 'false',
-    weather: config.section_weather !== 'false',
-    stocks: config.section_stocks !== 'false',
-    news: config.section_news !== 'false',
-    sports: config.section_sports !== 'false',
-    anthropicBilling: config.section_anthropicBilling !== 'false',
-    reddit: config.section_reddit !== 'false',
-  };
 
   const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const isFriday = nowET.getDay() === 5;
@@ -129,7 +116,6 @@ export async function compileAndSendDigest(): Promise<{
         time: executionTimeMs,
       });
     } else {
-      // This shouldn't happen since fetchSection catches errors
       console.error('Unexpected section failure:', result.reason);
     }
   }
@@ -201,7 +187,7 @@ export async function compileAndSendDigest(): Promise<{
   content.generatedAt = new Date().toISOString();
 
   // Generate email HTML
-  const digestName = config.digest_name || 'Morning Digest';
+  const digestName = automation.name;
   const html = generateDigestHtml(content, enabledSections, digestName);
   const subject = `☀️ ${digestName} — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
 
@@ -218,7 +204,7 @@ export async function compileAndSendDigest(): Promise<{
   const status = sendError ? 'error' : Object.keys(errors).length > 0 ? 'partial' : 'sent';
 
   // Save to database
-  const digestId = await saveDigest(content, status, errors, executionTimeMs, recipientEmail);
+  const digestId = await saveDigest(content, status, errors, executionTimeMs, recipientEmail, automation.id);
 
   // Save section logs
   for (const log of sectionLogs) {
@@ -237,22 +223,12 @@ export async function compileAndSendDigest(): Promise<{
   };
 }
 
-export async function previewDigest(): Promise<{ html: string; content: Record<string, any> }> {
+export async function previewDigest(automation: Automation): Promise<{ html: string; content: Record<string, any> }> {
   await ensureDatabase();
-  const config = await getAllConfig();
-  const lastDigest = await getLastDigestTimestamp();
-  const sinceTimestamp = lastDigest || subHours(new Date(), 24);
 
-  const enabledSections: Record<string, boolean> = {
-    emails: config.section_emails !== 'false',
-    calendar: config.section_calendar !== 'false',
-    weather: config.section_weather !== 'false',
-    stocks: config.section_stocks !== 'false',
-    news: config.section_news !== 'false',
-    sports: config.section_sports !== 'false',
-    anthropicBilling: config.section_anthropicBilling !== 'false',
-    reddit: config.section_reddit !== 'false',
-  };
+  const enabledSections = automation.sections;
+  const lastDigest = await getLastDigestTimestamp(automation.id);
+  const sinceTimestamp = lastDigest || subHours(new Date(), 24);
 
   const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const isFriday = nowET.getDay() === 5;
@@ -284,7 +260,7 @@ export async function previewDigest(): Promise<{ html: string; content: Record<s
   await Promise.allSettled(promises);
   content.errors = errors;
 
-  const digestName = config.digest_name || 'Morning Digest';
+  const digestName = automation.name;
   const html = generateDigestHtml(content, enabledSections, digestName);
   return { html, content };
 }

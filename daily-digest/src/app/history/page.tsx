@@ -10,6 +10,7 @@ interface DigestRecord {
   errors: Record<string, string> | null;
   execution_time_ms: number;
   recipient_email: string;
+  automation_name: string | null;
   content_json: any;
 }
 
@@ -75,7 +76,7 @@ export default function HistoryPage() {
           <p className="text-gray-500">Loading...</p>
         ) : digests.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">No digests sent yet. Send your first test digest from the dashboard.</p>
+            <p className="text-gray-500">No digests sent yet. Send your first test digest from an automation page.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -90,6 +91,7 @@ export default function HistoryPage() {
                     <span className="text-sm font-mono text-gray-400">#{digest.id}</span>
                     <div>
                       <p className="font-medium text-gray-900 text-sm">
+                        {digest.automation_name || 'Digest'} &mdash;{' '}
                         {new Date(digest.sent_at).toLocaleDateString('en-US', {
                           weekday: 'long',
                           month: 'long',
@@ -131,7 +133,7 @@ export default function HistoryPage() {
             <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Digest #{selectedDigest.id} &mdash; {new Date(selectedDigest.sent_at).toLocaleDateString()}
+                  {selectedDigest.automation_name || 'Digest'} #{selectedDigest.id} &mdash; {new Date(selectedDigest.sent_at).toLocaleDateString()}
                 </h2>
                 <button
                   onClick={() => setSelectedDigest(null)}
