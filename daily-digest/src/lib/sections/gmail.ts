@@ -177,7 +177,7 @@ export async function sendDigestEmail(
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
 
   const rawMessage = [
-    `From: dan@narrativemoney.com`,
+    `From: james@danplato.com`,
     `To: ${to}`,
     `Subject: ${encodedSubject}`,
     `MIME-Version: 1.0`,
