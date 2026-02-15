@@ -76,11 +76,9 @@ function extractCommentsFromContent(content: string): number {
 
 async function fetchSubredditPosts(
   subreddit: string,
-  sinceTimestamp: Date
 ): Promise<RedditPost[]> {
-  const cutoffTime = sinceTimestamp.getTime();
-
-  const url = `https://www.reddit.com/r/${subreddit}/hot.rss?limit=25`;
+  // Fetch hot posts - no timestamp filter since we want what's currently trending
+  const url = `https://www.reddit.com/r/${subreddit}/hot.rss?limit=15`;
 
   const xml = await withRetry(
     async () => {
@@ -101,9 +99,6 @@ async function fetchSubredditPosts(
 
   for (const item of items) {
     const publishedTime = item.published ? new Date(item.published).getTime() : 0;
-    if (publishedTime < cutoffTime) continue;
-
-    const permalink = item.link.replace('https://www.reddit.com', '');
 
     posts.push({
       title: item.title,
@@ -114,7 +109,7 @@ async function fetchSubredditPosts(
       permalink: item.link,
       author: item.author || 'unknown',
       createdUtc: publishedTime / 1000,
-      selfText: undefined,
+      selfText: extractSelfText(item.content),
       thumbnail: undefined,
     });
   }
@@ -122,7 +117,21 @@ async function fetchSubredditPosts(
   return posts.sort((a, b) => b.score - a.score).slice(0, 10);
 }
 
-export async function fetchReddit(sinceTimestamp: Date): Promise<RedditData> {
+function extractSelfText(content: string): string {
+  // Strip HTML tags to get plain text preview
+  const text = content
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.substring(0, 500);
+}
+
+export async function fetchReddit(_sinceTimestamp?: Date): Promise<RedditData> {
   const subredditConfig = await getConfig('reddit_subreddits');
   const subreddits = subredditConfig
     ? subredditConfig.split(',').map((s) => s.trim().replace(/^r\//, '')).filter(Boolean)
@@ -135,7 +144,7 @@ export async function fetchReddit(sinceTimestamp: Date): Promise<RedditData> {
   const results = await Promise.allSettled(
     subreddits.map(async (sub) => ({
       name: sub,
-      posts: await fetchSubredditPosts(sub, sinceTimestamp),
+      posts: await fetchSubredditPosts(sub),
     }))
   );
 

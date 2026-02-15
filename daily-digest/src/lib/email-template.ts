@@ -286,67 +286,26 @@ function renderNews(data: any): string {
   return html;
 }
 
-function isOurTeam(game: any, team: any): boolean {
-  // Match by ESPN team ID
-  const espnId = team.espnId;
-  if (espnId) {
-    if (String(game.homeTeamId) === String(espnId)) return true;
-    if (String(game.awayTeamId) === String(espnId)) return false;
-  }
-  // Fallback: we default to checking if it's home
-  return true;
-}
-
-function formatGameSummary(team: any): string | null {
-  const parts: string[] = [];
-
-  if (team.lastGame) {
-    const g = team.lastGame;
-    const isHome = isOurTeam(g, team);
-    const teamScore = isHome ? g.homeScore : g.awayScore;
-    const oppScore = isHome ? g.awayScore : g.homeScore;
-    const opponent = isHome ? g.awayTeam : g.homeTeam;
-
-    if (teamScore !== null && oppScore !== null && !isNaN(teamScore) && !isNaN(oppScore)) {
-      const won = teamScore > oppScore;
-      const verb = won ? 'defeated' : 'fell to';
-      const winScore = Math.max(teamScore, oppScore);
-      const loseScore = Math.min(teamScore, oppScore);
-      parts.push(`${verb} ${opponent} ${winScore}-${loseScore}${isHome ? ' at home' : ' on the road'}`);
-    } else {
-      parts.push(`${g.status} vs ${opponent}`);
-    }
-  }
-
-  if (team.nextGame) {
-    const g = team.nextGame;
-    const isHome = isOurTeam(g, team);
-    const opponent = isHome ? g.awayTeam : g.homeTeam;
-    const where = isHome ? 'host' : 'visit';
-    parts.push(`Next up: ${where} ${opponent} on ${g.date}`);
-  }
-
-  if (parts.length === 0) return null;
-  return parts.join('. ') + '.';
-}
-
 function renderSports(data: any): string {
   if (!data) return '';
 
-  // Filter to only teams with games to report
-  const teamsWithGames = (data.teams || []).filter(
-    (team: any) => team.lastGame || team.nextGame
-  );
+  // Only show teams that are recent (played in last 3 days or playing in next 2 days)
+  const recentTeams = (data.teams || []).filter((team: any) => team.isRecent);
 
-  if (teamsWithGames.length === 0) {
+  if (recentTeams.length === 0) {
     return sectionHeader('Sports', '🏀') +
       `<tr><td style="padding:8px 16px;font-size:13px;color:#94a3b8;">No recent games or upcoming matchups to report.</td></tr>`;
   }
 
   let html = sectionHeader('Sports', '🏀');
 
-  for (const team of teamsWithGames) {
-    const summary = formatGameSummary(team);
+  // Use AI summaries if available
+  const aiSummaries = data.aiSummary?.teamSummaries || [];
+  const aiMap = new Map(aiSummaries.map((s: any) => [s.name, s.summary]));
+
+  for (const team of recentTeams) {
+    const aiSummary = aiMap.get(team.name);
+    const summary = aiSummary || buildFallbackSummary(team);
     if (!summary) continue;
 
     html += `<tr><td style="padding:8px 16px;border-bottom:1px solid #f1f5f9;">
@@ -356,6 +315,36 @@ function renderSports(data: any): string {
   }
 
   return html;
+}
+
+function buildFallbackSummary(team: any): string | null {
+  const parts: string[] = [];
+  if (team.lastGame) {
+    const g = team.lastGame;
+    const espnId = team.espnId;
+    const isHome = espnId ? String(g.homeTeamId) === String(espnId) : true;
+    const teamScore = isHome ? g.homeScore : g.awayScore;
+    const oppScore = isHome ? g.awayScore : g.homeScore;
+    const opponent = isHome ? g.awayTeam : g.homeTeam;
+
+    if (teamScore !== null && oppScore !== null && !isNaN(teamScore) && !isNaN(oppScore)) {
+      const won = teamScore > oppScore;
+      const verb = won ? 'defeated' : 'fell to';
+      parts.push(`${verb} ${opponent} ${Math.max(teamScore, oppScore)}-${Math.min(teamScore, oppScore)}${isHome ? ' at home' : ' on the road'} (${g.date})`);
+    } else {
+      parts.push(`${g.status} vs ${opponent}`);
+    }
+  }
+  if (team.nextGame) {
+    const g = team.nextGame;
+    const espnId = team.espnId;
+    const isHome = espnId ? String(g.homeTeamId) === String(espnId) : true;
+    const opponent = isHome ? g.awayTeam : g.homeTeam;
+    const where = isHome ? 'host' : 'visit';
+    parts.push(`Next up: ${where} ${opponent} on ${g.date}`);
+  }
+  if (parts.length === 0) return null;
+  return parts.join('. ') + '.';
 }
 
 function renderAnthropicBilling(data: any): string {
@@ -430,28 +419,41 @@ function renderDiscord(data: any): string {
 function renderReddit(data: any): string {
   if (!data) return '';
 
-  let html = sectionHeader('Reddit Feed', '🔗');
+  let html = sectionHeader('Reddit Trending', '🔗');
 
-  for (const sub of data.subreddits || []) {
-    html += `<tr><td style="padding:4px 16px;">
-      <p style="margin:0;font-weight:600;font-size:13px;color:#ff4500;">r/${sub.name}</p>
-    </td></tr>`;
+  // Use AI summaries if available
+  const aiSummaries = data.aiSummary?.subredditSummaries || [];
+  const aiMap = new Map(aiSummaries.map((s: any) => [s.name, s.summary]));
 
-    if (sub.posts.length === 0) {
-      html += `<tr><td style="padding:2px 32px;font-size:12px;color:#94a3b8;">No new posts</td></tr>`;
-    }
+  // Filter to subreddits with posts
+  const subsWithPosts = (data.subreddits || []).filter((s: any) => s.posts?.length > 0);
 
-    for (const post of sub.posts.slice(0, 5)) {
-      html += `
-        <tr><td style="padding:2px 32px;">
-          <p style="margin:0;font-size:13px;">
+  if (subsWithPosts.length === 0 && aiSummaries.length === 0) {
+    html += `<tr><td style="padding:8px 16px;font-size:13px;color:#94a3b8;">Nothing notable trending in your subreddits right now.</td></tr>`;
+    return html;
+  }
+
+  for (const sub of subsWithPosts) {
+    const aiSummary = aiMap.get(sub.name);
+
+    html += `<tr><td style="padding:8px 16px;border-bottom:1px solid #f1f5f9;">
+      <p style="margin:0;font-weight:600;font-size:14px;color:#ff4500;">r/${sub.name}</p>`;
+
+    if (aiSummary) {
+      html += `<p style="margin:4px 0 0 0;font-size:13px;color:#475569;line-height:1.4;">${aiSummary}</p>`;
+    } else {
+      // Fallback: show top posts
+      for (const post of sub.posts.slice(0, 3)) {
+        html += `
+          <p style="margin:3px 0 0 12px;font-size:13px;">
             <span style="color:#ff4500;font-weight:600;font-size:11px;">⬆${post.score}</span>
             <a href="${post.permalink}" style="color:#1e293b;text-decoration:none;">${post.title}</a>
             <span style="color:#94a3b8;font-size:11px;"> (${post.numComments} comments)</span>
-          </p>
-        </td></tr>
-      `;
+          </p>`;
+      }
     }
+
+    html += `</td></tr>`;
   }
 
   if (data.error) {

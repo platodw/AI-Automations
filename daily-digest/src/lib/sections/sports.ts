@@ -9,6 +9,7 @@ interface GameScore {
   awayScore: number | null;
   status: string;
   date: string;
+  rawDate: string; // ISO string for recency checks
   league: string;
 }
 
@@ -18,6 +19,8 @@ interface TeamData {
   lastGame: GameScore | null;
   nextGame: GameScore | null;
   record?: string;
+  headlines: string[];
+  isRecent: boolean; // true if last game within 3 days or next game within 2 days
 }
 
 interface SportsData {
@@ -56,6 +59,51 @@ function formatDateET(date: Date): string {
     minute: '2-digit',
     timeZone: 'America/New_York',
   });
+}
+
+function checkRecency(lastGame: GameScore | null, nextGame: GameScore | null): boolean {
+  const now = new Date();
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+
+  if (lastGame?.rawDate) {
+    const lastDate = new Date(lastGame.rawDate);
+    if (now.getTime() - lastDate.getTime() <= THREE_DAYS_MS) return true;
+  }
+  if (nextGame?.rawDate) {
+    const nextDate = new Date(nextGame.rawDate);
+    if (nextDate.getTime() - now.getTime() <= TWO_DAYS_MS) return true;
+  }
+  return false;
+}
+
+function getSportPath(team: typeof TEAMS[number]): string {
+  if (team.league.includes('college')) {
+    return team.sport === 'football' ? 'football/college-football'
+      : team.sport === 'basketball' ? 'basketball/mens-college-basketball'
+      : team.sport === 'lacrosse' ? 'lacrosse/mens-college-lacrosse'
+      : 'soccer/college-soccer';
+  }
+  return `${team.sport}/${team.league}`;
+}
+
+async function fetchTeamHeadlines(team: typeof TEAMS[number]): Promise<string[]> {
+  try {
+    const sportPath = getSportPath(team);
+    const url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/news?team=${team.espnId}&limit=3`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'DailyDigest/1.0' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.articles || []).slice(0, 3).map((a: any) => {
+      const headline = a.headline || '';
+      const description = a.description || '';
+      return description ? `${headline}: ${description}` : headline;
+    }).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamData> {
@@ -104,6 +152,7 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
         awayScore: competitions.status?.type?.completed ? parseScore(awayComp) : null,
         status: competitions.status?.type?.shortDetail || event.status?.type?.shortDetail || 'Scheduled',
         date: formatDateET(eventDate),
+        rawDate: eventDate.toISOString(),
         league: team.league,
       };
 
@@ -115,8 +164,10 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
     }
 
     const record = data.team?.record?.items?.[0]?.summary;
+    const headlines = await fetchTeamHeadlines(team);
+    const isRecent = checkRecency(lastGame, nextGame);
 
-    return { name: team.name, espnId: team.espnId, lastGame, nextGame, record };
+    return { name: team.name, espnId: team.espnId, lastGame, nextGame, record, headlines, isRecent };
   } catch {
     // Try the scoreboard endpoint as fallback
     try {
@@ -142,21 +193,26 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
           const homeComp = competitions.competitors.find((c: any) => c.homeAway === 'home');
           const awayComp = competitions.competitors.find((c: any) => c.homeAway === 'away');
 
+          const lastGame: GameScore = {
+            homeTeam: homeComp?.team?.displayName || 'TBD',
+            homeTeamId: String(homeComp?.team?.id || ''),
+            awayTeam: awayComp?.team?.displayName || 'TBD',
+            awayTeamId: String(awayComp?.team?.id || ''),
+            homeScore: parseScore(homeComp),
+            awayScore: parseScore(awayComp),
+            status: competitions.status?.type?.shortDetail || 'Final',
+            date: formatDateET(new Date(teamEvent.date)),
+            rawDate: new Date(teamEvent.date).toISOString(),
+            league: team.league,
+          };
+          const headlines = await fetchTeamHeadlines(team);
           return {
             name: team.name,
             espnId: team.espnId,
-            lastGame: {
-              homeTeam: homeComp?.team?.displayName || 'TBD',
-              homeTeamId: String(homeComp?.team?.id || ''),
-              awayTeam: awayComp?.team?.displayName || 'TBD',
-              awayTeamId: String(awayComp?.team?.id || ''),
-              homeScore: parseScore(homeComp),
-              awayScore: parseScore(awayComp),
-              status: competitions.status?.type?.shortDetail || 'Final',
-              date: formatDateET(new Date(teamEvent.date)),
-              league: team.league,
-            },
+            lastGame,
             nextGame: null,
+            headlines,
+            isRecent: checkRecency(lastGame, null),
           };
         }
       }
@@ -169,6 +225,8 @@ async function fetchESPNTeamSchedule(team: typeof TEAMS[number]): Promise<TeamDa
       espnId: team.espnId,
       lastGame: null,
       nextGame: null,
+      headlines: [],
+      isRecent: false,
     };
   }
 }
@@ -186,7 +244,7 @@ export async function fetchSports(): Promise<SportsData> {
       teams.push(result.value);
     } else {
       errors.push(`${TEAMS[i].name}: ${result.reason}`);
-      teams.push({ name: TEAMS[i].name, espnId: TEAMS[i].espnId, lastGame: null, nextGame: null });
+      teams.push({ name: TEAMS[i].name, espnId: TEAMS[i].espnId, lastGame: null, nextGame: null, headlines: [], isRecent: false });
     }
   }
 

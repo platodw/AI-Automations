@@ -9,6 +9,8 @@ import { fetchAnthropicBilling } from '@/lib/sections/anthropic-billing';
 import { fetchDiscordUpdates } from '@/lib/sections/discord';
 import { fetchReddit } from '@/lib/sections/reddit';
 import { summarizeEmails } from '@/lib/sections/ai-summarizer';
+import { summarizeSports } from '@/lib/sections/sports-summarizer';
+import { summarizeReddit } from '@/lib/sections/reddit-summarizer';
 import { addActionItems } from '@/lib/sections/notion';
 import { generateDigestHtml } from '@/lib/email-template';
 import { format, subHours } from 'date-fns';
@@ -175,6 +177,30 @@ export async function compileAndSendDigest(): Promise<{
     } catch (aiErr) {
       console.error('[Digest] Email AI summarization failed:', aiErr);
       errors.emailSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+    }
+  }
+
+  // AI-summarize sports
+  if (content.sports && !errors.sports) {
+    try {
+      const sportsSummary = await summarizeSports(content.sports);
+      content.sports.aiSummary = sportsSummary;
+      console.log(`[Digest] AI sports summary generated for ${sportsSummary.teamSummaries.length} teams`);
+    } catch (aiErr) {
+      console.error('[Digest] Sports AI summarization failed:', aiErr);
+      errors.sportsSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+    }
+  }
+
+  // AI-summarize Reddit
+  if (content.reddit && !errors.reddit) {
+    try {
+      const redditSummary = await summarizeReddit(content.reddit);
+      content.reddit.aiSummary = redditSummary;
+      console.log(`[Digest] AI Reddit summary generated for ${redditSummary.subredditSummaries.length} subreddits`);
+    } catch (aiErr) {
+      console.error('[Digest] Reddit AI summarization failed:', aiErr);
+      errors.redditSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
     }
   }
 
