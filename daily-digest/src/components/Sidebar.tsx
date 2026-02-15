@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 const NAV_ITEMS = [
   { href: '/', label: 'Automations', icon: '🤖' },
   { href: '/history', label: 'History', icon: '📜' },
-  { href: '/setup', label: 'Setup Wizard', icon: '🔧' },
 ];
 
 export default function Sidebar() {

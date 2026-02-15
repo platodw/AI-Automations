@@ -9,13 +9,13 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/setup?error=${encodeURIComponent(error)}`, req.url)
+      new URL(`/?error=${encodeURIComponent(error)}`, req.url)
     );
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL('/setup?error=Missing+code+or+state', req.url)
+      new URL('/?error=Missing+code+or+state', req.url)
     );
   }
 
@@ -24,13 +24,13 @@ export async function GET(req: NextRequest) {
     await handleGoogleCallback(code, state);
     console.log(`[OAuth] Successfully saved tokens for ${state}`);
     return NextResponse.redirect(
-      new URL(`/setup?success=${encodeURIComponent(state)}`, req.url)
+      new URL(`/?success=${encodeURIComponent(state)}`, req.url)
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error(`[OAuth] Callback error for ${state}:`, message);
     return NextResponse.redirect(
-      new URL(`/setup?error=${encodeURIComponent(message)}`, req.url)
+      new URL(`/?error=${encodeURIComponent(message)}`, req.url)
     );
   }
 }
