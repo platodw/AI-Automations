@@ -171,7 +171,8 @@ export async function sendDigestEmail(
   subject: string,
   htmlContent: string
 ) {
-  const auth = await getAuthenticatedClient('platodw@gmail.com');
+  // Send via dan@danplato.com so the james@danplato.com alias is honored
+  const auth = await getAuthenticatedClient('dan@danplato.com');
   const gmail = google.gmail({ version: 'v1', auth });
 
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
