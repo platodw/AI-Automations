@@ -88,7 +88,7 @@ export async function fetchEmails(sinceTimestamp: Date) {
       const gmail = google.gmail({ version: 'v1', auth });
 
       const afterEpoch = Math.floor(sinceTimestamp.getTime() / 1000);
-      const query = `is:unread after:${afterEpoch}`;
+      const query = `after:${afterEpoch}`;
 
       const messageList = await withRetry(
         () => gmail.users.messages.list({
@@ -161,7 +161,7 @@ export async function fetchEmails(sinceTimestamp: Date) {
       error: r.error,
     })),
     grouped,
-    totalUnread: results.reduce((sum, r) => sum + r.emails.length, 0),
+    totalEmails: results.reduce((sum, r) => sum + r.emails.length, 0),
     raw: results,
   };
 }

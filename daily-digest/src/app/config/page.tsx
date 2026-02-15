@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 
 const SECTIONS = [
-  { key: 'emails', label: 'Email Summaries', desc: 'Unread emails from Gmail accounts' },
+  { key: 'emails', label: 'Email Summaries', desc: 'Emails received since last digest with AI-powered action items' },
   { key: 'calendar', label: 'Calendar Events', desc: 'Today and tomorrow events' },
   { key: 'weather', label: 'Weather', desc: 'Lyndhurst, OH forecast' },
   { key: 'stocks', label: 'Stock Market', desc: 'S&P 500, Dow, Nasdaq' },
@@ -114,6 +114,26 @@ export default function ConfigPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Delivery Settings</h2>
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Digest Name</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={config.digest_name || ''}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, digest_name: e.target.value }))}
+                  placeholder="Morning Digest"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <button
+                  onClick={() => saveConfig({ digest_name: config.digest_name || '' })}
+                  disabled={saving}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Used in the email subject line and header. Default: Morning Digest</p>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
               <div className="flex gap-2">

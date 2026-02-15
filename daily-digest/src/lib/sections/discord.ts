@@ -37,10 +37,16 @@ export async function fetchDiscordUpdates(sinceTimestamp: Date): Promise<Discord
         const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
           headers: { Authorization: `Bot ${botToken}` },
         });
+        if (res.status === 401) {
+          throw new Error('Discord bot token is invalid or expired. Please regenerate your bot token at https://discord.com/developers/applications and update the DISCORD_BOT_TOKEN environment variable.');
+        }
+        if (res.status === 403) {
+          throw new Error('Discord bot lacks permissions. Make sure the bot has been invited to the server with the "Read Messages" permission and has access to the target channels.');
+        }
         if (!res.ok) throw new Error(`Discord API error: ${res.status}`);
         return res.json();
       },
-      { label: 'discord-channels' }
+      { label: 'discord-channels', retries: 0 }
     );
 
     const targetChannels = channelsData.filter((ch: any) =>

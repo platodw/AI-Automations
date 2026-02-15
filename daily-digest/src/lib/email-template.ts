@@ -57,29 +57,33 @@ function errorSection(sectionName: string, error: string): string {
 
 function renderEmails(data: any): string {
   if (!data) return '';
-  const { accounts, totalUnread, aiSummary, notionItemsAdded } = data;
+  const { accounts, aiSummary, notionItemsAdded } = data;
+  const totalEmails = data.totalEmails ?? data.totalUnread ?? 0;
 
-  let html = sectionHeader(`Email Summary (${totalUnread} unread)`, '📧');
+  let html = sectionHeader(`Email Summary (${totalEmails} received)`, '📧');
 
   // Account summary
   for (const acc of accounts || []) {
     html += `
       <tr><td style="padding:4px 16px;">
-        <span style="font-size:13px;color:#64748b;">${acc.account}: ${acc.count} unread</span>
+        <span style="font-size:13px;color:#64748b;">${acc.account}: ${acc.count} emails</span>
         ${acc.error ? `<span style="color:#ef4444;font-size:12px;"> (${acc.error})</span>` : ''}
       </td></tr>
     `;
   }
 
-  // AI Summaries
-  if (aiSummary?.summaries?.length > 0) {
+  // AI Summaries - Important emails first
+  const importantEmails = (aiSummary?.summaries || []).filter((s: any) => s.priority === 'high');
+  const otherEmails = (aiSummary?.summaries || []).filter((s: any) => s.priority !== 'high');
+
+  if (importantEmails.length > 0) {
     html += `<tr><td style="padding:8px 16px 4px;">
-      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">Key Emails</p>
+      <p style="margin:0;font-size:12px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;">⚡ Needs Your Attention</p>
     </td></tr>`;
 
-    for (const item of aiSummary.summaries) {
+    for (const item of importantEmails) {
       html += `
-        <tr><td style="padding:6px 16px;border-left:3px solid #6366f1;">
+        <tr><td style="padding:6px 16px;border-left:3px solid #dc2626;">
           <p style="margin:0;font-weight:600;font-size:13px;color:#1e293b;">${item.from}</p>
           <p style="margin:1px 0;font-size:12px;color:#64748b;font-style:italic;">Re: ${item.subject}</p>
           <p style="margin:4px 0 2px;font-size:13px;color:#475569;">${item.summary}</p>
@@ -95,10 +99,35 @@ function renderEmails(data: any): string {
     }
   }
 
+  if (otherEmails.length > 0) {
+    html += `<tr><td style="padding:8px 16px 4px;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">Other Emails</p>
+    </td></tr>`;
+
+    for (const item of otherEmails) {
+      html += `
+        <tr><td style="padding:6px 16px;border-left:3px solid #e2e8f0;">
+          <p style="margin:0;font-weight:600;font-size:13px;color:#64748b;">${item.from}</p>
+          <p style="margin:1px 0;font-size:12px;color:#94a3b8;font-style:italic;">Re: ${item.subject}</p>
+          <p style="margin:4px 0 2px;font-size:13px;color:#94a3b8;">${item.summary}</p>
+        </td></tr>
+      `;
+    }
+  }
+
+  // Low priority note
+  if (aiSummary?.lowPriorityNote) {
+    html += `<tr><td style="padding:8px 16px;">
+      <p style="margin:0;font-size:13px;color:#94a3b8;font-style:italic;">${aiSummary.lowPriorityNote}</p>
+    </td></tr>`;
+  }
+
   // Action items added to Notion
   if (aiSummary?.actionItems?.length > 0) {
     html += `<tr><td style="padding:12px 16px 4px;">
-      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">Action Items${notionItemsAdded ? ` (${notionItemsAdded} added to Notion)` : ''}</p>
+      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">
+        📋 Action Items${notionItemsAdded ? ` — ${notionItemsAdded} added to your Notion task list` : ''}
+      </p>
     </td></tr>`;
     for (const item of aiSummary.actionItems) {
       html += `
@@ -463,7 +492,7 @@ function renderReddit(data: any): string {
   return html;
 }
 
-export function generateDigestHtml(content: DigestContent, enabledSections: Record<string, boolean>): string {
+export function generateDigestHtml(content: DigestContent, enabledSections: Record<string, boolean>, digestName: string = 'Morning Digest'): string {
   const now = new Date();
   const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const dateStr = format(nowET, 'EEEE, MMMM d, yyyy');
@@ -496,7 +525,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Morning Digest — ${dateStr}</title>
+  <title>${digestName} — ${dateStr}</title>
 </head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table role="presentation" style="width:100%;border-collapse:collapse;">
@@ -506,7 +535,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:28px 24px;text-align:center;">
-              <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">☀️ Morning Digest</h1>
+              <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">☀️ ${digestName}</h1>
               <p style="margin:6px 0 0;font-size:14px;color:#c7d2fe;">${dateStr}${isFriday ? ' • 🎉 TGIF' : ''}</p>
             </td>
           </tr>
@@ -524,7 +553,7 @@ export function generateDigestHtml(content: DigestContent, enabledSections: Reco
           <tr>
             <td style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e2e8f0;">
               <p style="margin:0;font-size:11px;color:#94a3b8;">
-                Generated at ${format(now, 'h:mm a')} EST • Morning Digest by Dan Plato
+                Generated at ${format(now, 'h:mm a')} EST • ${digestName} by Dan Plato
               </p>
             </td>
           </tr>

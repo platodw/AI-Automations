@@ -13,9 +13,11 @@ interface EmailSummaryResult {
     from: string;
     subject: string;
     summary: string;
+    priority?: string;
     actionItems: string[];
   }>;
   actionItems: string[];
+  lowPriorityNote?: string;
 }
 
 export async function summarizeEmails(emails: EmailForSummary[]): Promise<EmailSummaryResult> {
@@ -40,12 +42,19 @@ Body:
 ${bodyPreview}`;
   }).join('\n\n');
 
-  const prompt = `You are summarizing emails for a morning digest. For each important email, provide:
-1. A brief 1-2 sentence summary of the key points
-2. Any action items that require follow-up
+  const prompt = `You are summarizing emails for a personal daily digest. Your goal is to help the reader quickly understand what came in and what needs their attention.
 
-Skip promotional emails, newsletters that aren't important, and automated notifications.
-Focus on emails that require attention or contain important information.
+For each email, categorize it as either:
+- **Important / Action Required**: Emails that need a response, contain deadlines, requests, bills, appointments, or anything requiring follow-up
+- **FYI / Low Priority**: Newsletters, promotional emails, automated notifications, social media alerts, etc.
+
+For important emails:
+1. Provide a brief 1-2 sentence summary of the key points
+2. List specific action items the reader needs to take
+
+For FYI emails, you can group them together with a brief mention (e.g., "You also received 3 promotional emails from X, Y, Z and 2 shipping notifications").
+
+Be conversational — think of it as a friend saying "Hey, here's what landed in your inbox. Most of it is junk, but these few things actually need your attention, so I added them to your task list."
 
 Here are the emails:
 
@@ -58,13 +67,13 @@ Respond in this exact JSON format (no markdown, just raw JSON):
       "from": "sender name",
       "subject": "email subject",
       "summary": "Brief summary of key points",
+      "priority": "high" or "low",
       "actionItems": ["action item 1", "action item 2"]
     }
   ],
-  "actionItems": ["All action items combined into a flat list with context about who/what they relate to"]
-}
-
-Only include emails worth highlighting. If an email is spam or unimportant, skip it.`;
+  "actionItems": ["All action items combined into a flat list with context about who/what they relate to — these will be added to the reader's Notion task list"],
+  "lowPriorityNote": "A brief sentence summarizing the unimportant emails, e.g. 'You also got 5 promotional emails and 2 shipping updates — nothing requiring action.'"
+}`;
 
   const response = await withRetry(
     async () => {
@@ -103,6 +112,7 @@ Only include emails worth highlighting. If an email is spam or unimportant, skip
     return {
       summaries: parsed.summaries || [],
       actionItems: parsed.actionItems || [],
+      lowPriorityNote: parsed.lowPriorityNote || '',
     };
   } catch {
     console.error('[AI] Failed to parse email summary response');

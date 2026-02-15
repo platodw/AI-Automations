@@ -208,8 +208,9 @@ export async function compileAndSendDigest(): Promise<{
   content.generatedAt = new Date().toISOString();
 
   // Generate email HTML
-  const html = generateDigestHtml(content, enabledSections);
-  const subject = `☀️ Morning Digest — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
+  const digestName = config.digest_name || 'Morning Digest';
+  const html = generateDigestHtml(content, enabledSections, digestName);
+  const subject = `☀️ ${digestName} — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
 
   // Send email
   let sendError: string | null = null;
@@ -292,6 +293,7 @@ export async function previewDigest(): Promise<{ html: string; content: Record<s
   await Promise.allSettled(promises);
   content.errors = errors;
 
-  const html = generateDigestHtml(content, enabledSections);
+  const digestName = config.digest_name || 'Morning Digest';
+  const html = generateDigestHtml(content, enabledSections, digestName);
   return { html, content };
 }
