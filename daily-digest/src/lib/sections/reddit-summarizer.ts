@@ -33,14 +33,16 @@ export async function summarizeReddit(redditData: any): Promise<RedditSummaryRes
     return `r/${sub.name}:\n${postList}`;
   }).join('\n\n---\n\n');
 
-  const prompt = `You are writing the Reddit section of a personal daily morning digest email. For each subreddit, write a brief 1-3 sentence summary of what's trending and interesting right now. Think of it as a friend telling you "here's what people are talking about on Reddit."
+  const prompt = `You are writing the Reddit section of a personal daily morning digest email. For each subreddit, write a 2-4 sentence narrative summary describing what's happening and what people are talking about — like a friend casually filling you in over coffee.
 
 Guidelines:
-- Be conversational and concise
-- Highlight the most interesting or notable discussions
-- Skip mundane posts; focus on what would actually be interesting to know
-- If a subreddit only has low-engagement posts, keep it to one sentence
-- Don't list every post — summarize the vibe and highlight 1-2 standout threads
+- Write in flowing sentences, NOT bullet points or lists
+- Actually describe what's being discussed — don't just say "people are talking about X", tell me WHAT they're saying about it
+- Capture the mood and tone of the community (excited, frustrated, debating, celebrating, etc.)
+- Highlight 1-2 standout posts by weaving them into your summary naturally (e.g. "One post that blew up was about...")
+- If there's drama, hot takes, or something genuinely surprising — lead with that
+- Keep it engaging and human — like you're gossiping about internet culture
+- For low-engagement subreddits, a single vivid sentence is fine
 
 Here are the subreddits:
 

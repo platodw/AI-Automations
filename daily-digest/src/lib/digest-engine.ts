@@ -10,6 +10,7 @@ import { fetchReddit } from '@/lib/sections/reddit';
 import { summarizeEmails } from '@/lib/sections/ai-summarizer';
 import { summarizeSports } from '@/lib/sections/sports-summarizer';
 import { summarizeReddit } from '@/lib/sections/reddit-summarizer';
+import { summarizeCalendar } from '@/lib/sections/calendar-summarizer';
 import { addActionItems } from '@/lib/sections/notion';
 import { generateDigestHtml } from '@/lib/email-template';
 import { format, subHours } from 'date-fns';
@@ -183,6 +184,18 @@ export async function compileAndSendDigest(automation: Automation): Promise<{
     }
   }
 
+  // AI-summarize Calendar
+  if (content.calendar && !errors.calendar) {
+    try {
+      const calendarSummary = await summarizeCalendar(content.calendar);
+      content.calendar.aiSummary = calendarSummary;
+      console.log('[Digest] AI calendar summary generated');
+    } catch (aiErr) {
+      console.error('[Digest] Calendar AI summarization failed:', aiErr);
+      errors.calendarSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+    }
+  }
+
   content.errors = errors;
   content.generatedAt = new Date().toISOString();
 
@@ -258,6 +271,57 @@ export async function previewDigest(automation: Automation): Promise<{ html: str
     });
 
   await Promise.allSettled(promises);
+
+  // AI-summarize emails
+  if (content.emails && !errors.emails) {
+    try {
+      const allEmails: any[] = [];
+      for (const result of content.emails.raw || []) {
+        for (const email of result.emails || []) {
+          allEmails.push({
+            from: email.from,
+            subject: email.subject,
+            body: email.body || email.snippet || '',
+            date: email.date,
+            account: result.account,
+          });
+        }
+      }
+      if (allEmails.length > 0) {
+        content.emails.aiSummary = await summarizeEmails(allEmails);
+      }
+    } catch (e) {
+      console.error('[Preview] Email AI summarization failed:', e);
+    }
+  }
+
+  // AI-summarize sports
+  if (content.sports && !errors.sports) {
+    try {
+      content.sports.aiSummary = await summarizeSports(content.sports);
+    } catch (e) {
+      console.error('[Preview] Sports AI summarization failed:', e);
+    }
+  }
+
+  // AI-summarize Reddit
+  if (content.reddit && !errors.reddit) {
+    try {
+      content.reddit.aiSummary = await summarizeReddit(content.reddit);
+    } catch (e) {
+      console.error('[Preview] Reddit AI summarization failed:', e);
+    }
+  }
+
+  // AI-summarize Calendar
+  if (content.calendar && !errors.calendar) {
+    try {
+      content.calendar.aiSummary = await summarizeCalendar(content.calendar);
+    } catch (e) {
+      console.error('[Preview] Calendar AI summarization failed:', e);
+    }
+  }
+
   content.errors = errors;
 
   const digestName = automation.name;

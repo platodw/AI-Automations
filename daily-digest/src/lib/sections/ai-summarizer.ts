@@ -9,6 +9,11 @@ interface EmailForSummary {
 }
 
 interface EmailSummaryResult {
+  overview: string;
+  accountBreakdowns: Array<{
+    account: string;
+    summary: string;
+  }>;
   summaries: Array<{
     from: string;
     subject: string;
@@ -27,7 +32,7 @@ export async function summarizeEmails(emails: EmailForSummary[]): Promise<EmailS
   }
 
   if (emails.length === 0) {
-    return { summaries: [], actionItems: [] };
+    return { overview: '', accountBreakdowns: [], summaries: [], actionItems: [] };
   }
 
   // Build a prompt with all emails
@@ -42,19 +47,37 @@ Body:
 ${bodyPreview}`;
   }).join('\n\n');
 
-  const prompt = `You are summarizing emails for a personal daily digest. Your goal is to help the reader quickly understand what came in and what needs their attention.
+  // Group emails by account for per-account context
+  const emailsByAccount = new Map<string, typeof emails>();
+  for (const e of emails.slice(0, 20)) {
+    const acc = e.account;
+    if (!emailsByAccount.has(acc)) emailsByAccount.set(acc, []);
+    emailsByAccount.get(acc)!.push(e);
+  }
+  const accountList = Array.from(emailsByAccount.entries())
+    .map(([acc, emails]) => `${acc}: ${emails.length} emails`)
+    .join(', ');
 
-For each email, categorize it as either:
-- **Important / Action Required**: Emails that need a response, contain deadlines, requests, bills, appointments, or anything requiring follow-up
-- **FYI / Low Priority**: Newsletters, promotional emails, automated notifications, social media alerts, etc.
+  const prompt = `You are writing the email section of a personal daily morning digest. Your job is to give the reader a clear, friendly picture of what landed in their inbox — and specifically what needs their attention.
 
-For important emails:
-1. Provide a brief 1-2 sentence summary of the key points
-2. List specific action items the reader needs to take
+IMPORTANT: Write this like a smart assistant briefing someone over coffee. Don't just list emails — tell the reader what's going on across their inboxes in plain English.
 
-For FYI emails, you can group them together with a brief mention (e.g., "You also received 3 promotional emails from X, Y, Z and 2 shipping notifications").
+The reader has these email accounts: ${accountList}
 
-Be conversational — think of it as a friend saying "Hey, here's what landed in your inbox. Most of it is junk, but these few things actually need your attention, so I added them to your task list."
+Your response MUST include:
+
+1. **overview**: A 2-4 sentence conversational paragraph summarizing the inbox. Start with the big picture ("Relatively quiet morning — mostly newsletters and a couple things that need your attention" or "Busy inbox today — you've got a few important threads to deal with"). Then highlight the most important items by name. End with reassurance about what can be ignored.
+
+2. **accountBreakdowns**: For EACH email account, write 1-2 sentences describing what came into that specific account. Be specific — mention key senders and topics ("Your dan@danplato.com inbox got a client follow-up from James about the proposal deadline and a couple of newsletters").
+
+3. **summaries**: For each email, provide:
+   - Priority: "high" for anything needing a response, containing deadlines, bills, appointments, or follow-ups. "low" for newsletters, promos, automated notifications.
+   - A 1-2 sentence summary of key points (for high priority)
+   - Specific action items (for high priority)
+
+4. **actionItems**: A combined flat list of ALL action items with enough context to stand alone (these get added to Notion). Write them as clear tasks like "Reply to James about the proposal deadline (from dan@danplato.com)" — not vague things like "respond to email".
+
+5. **lowPriorityNote**: A friendly sentence about the unimportant emails ("The rest is the usual — a couple newsletters from Morning Brew and The Hustle, and some promotional stuff. Nothing you need to deal with.")
 
 Here are the emails:
 
@@ -62,6 +85,13 @@ ${emailTexts}
 
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
+  "overview": "Your conversational inbox overview paragraph here",
+  "accountBreakdowns": [
+    {
+      "account": "email@example.com",
+      "summary": "What came into this account"
+    }
+  ],
   "summaries": [
     {
       "from": "sender name",
@@ -71,8 +101,8 @@ Respond in this exact JSON format (no markdown, just raw JSON):
       "actionItems": ["action item 1", "action item 2"]
     }
   ],
-  "actionItems": ["All action items combined into a flat list with context about who/what they relate to — these will be added to the reader's Notion task list"],
-  "lowPriorityNote": "A brief sentence summarizing the unimportant emails, e.g. 'You also got 5 promotional emails and 2 shipping updates — nothing requiring action.'"
+  "actionItems": ["All action items as clear standalone tasks for Notion"],
+  "lowPriorityNote": "Friendly summary of the unimportant emails"
 }`;
 
   const response = await withRetry(
@@ -107,15 +137,17 @@ Respond in this exact JSON format (no markdown, just raw JSON):
   try {
     // Extract JSON from response (handle potential markdown wrapping)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { summaries: [], actionItems: [] };
+    if (!jsonMatch) return { overview: '', accountBreakdowns: [], summaries: [], actionItems: [] };
     const parsed = JSON.parse(jsonMatch[0]);
     return {
+      overview: parsed.overview || '',
+      accountBreakdowns: parsed.accountBreakdowns || [],
       summaries: parsed.summaries || [],
       actionItems: parsed.actionItems || [],
       lowPriorityNote: parsed.lowPriorityNote || '',
     };
   } catch {
     console.error('[AI] Failed to parse email summary response');
-    return { summaries: [], actionItems: [] };
+    return { overview: '', accountBreakdowns: [], summaries: [], actionItems: [] };
   }
 }

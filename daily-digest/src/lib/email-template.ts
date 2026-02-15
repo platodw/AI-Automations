@@ -56,59 +56,57 @@ function errorSection(sectionName: string, error: string): string {
 
 function renderEmails(data: any): string {
   if (!data) return '';
-  const { accounts, aiSummary, notionItemsAdded } = data;
+  const { aiSummary, notionItemsAdded } = data;
   const totalEmails = data.totalEmails ?? data.totalUnread ?? 0;
 
-  let html = sectionHeader(`Email Summary (${totalEmails} received)`, '📧');
+  let html = sectionHeader(`Inbox (${totalEmails} emails)`, '📧');
 
-  // Account summary
-  for (const acc of accounts || []) {
-    html += `
-      <tr><td style="padding:4px 16px;">
-        <span style="font-size:13px;color:#64748b;">${acc.account}: ${acc.count} emails</span>
-        ${acc.error ? `<span style="color:#ef4444;font-size:12px;"> (${acc.error})</span>` : ''}
-      </td></tr>
-    `;
+  // AI Overview — the narrative paragraph
+  if (aiSummary?.overview) {
+    html += `<tr><td style="padding:8px 16px;">
+      <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">${aiSummary.overview}</p>
+    </td></tr>`;
   }
 
-  // AI Summaries - Important emails first
-  const importantEmails = (aiSummary?.summaries || []).filter((s: any) => s.priority === 'high');
-  const otherEmails = (aiSummary?.summaries || []).filter((s: any) => s.priority !== 'high');
+  // Per-account breakdowns
+  if (aiSummary?.accountBreakdowns?.length > 0) {
+    for (const ab of aiSummary.accountBreakdowns) {
+      html += `<tr><td style="padding:6px 16px;border-left:3px solid #6366f1;margin-top:8px;">
+        <p style="margin:0;font-weight:600;font-size:13px;color:#4f46e5;">${ab.account}</p>
+        <p style="margin:2px 0 0;font-size:13px;color:#475569;line-height:1.4;">${ab.summary}</p>
+      </td></tr>`;
+    }
+  }
 
+  // Action items added to Notion — prominent callout
+  if (aiSummary?.actionItems?.length > 0) {
+    html += `<tr><td style="padding:12px 16px;">
+      <table style="width:100%;border-collapse:collapse;background:#f0f9ff;border-radius:8px;border:1px solid #bfdbfe;">
+        <tr><td style="padding:12px 16px;">
+          <p style="margin:0;font-size:13px;font-weight:700;color:#1e40af;">
+            📋 Action Items${notionItemsAdded ? ` — ${notionItemsAdded} added to Notion` : ''}
+          </p>
+          ${aiSummary.actionItems.map((item: string) => `
+            <p style="margin:4px 0 0 4px;font-size:13px;color:#1e3a5f;">☐ ${item}</p>
+          `).join('')}
+        </td></tr>
+      </table>
+    </td></tr>`;
+  }
+
+  // Important emails — details
+  const importantEmails = (aiSummary?.summaries || []).filter((s: any) => s.priority === 'high');
   if (importantEmails.length > 0) {
-    html += `<tr><td style="padding:8px 16px 4px;">
-      <p style="margin:0;font-size:12px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;">⚡ Needs Your Attention</p>
+    html += `<tr><td style="padding:12px 16px 4px;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;">Needs Your Attention</p>
     </td></tr>`;
 
     for (const item of importantEmails) {
       html += `
         <tr><td style="padding:6px 16px;border-left:3px solid #dc2626;">
           <p style="margin:0;font-weight:600;font-size:13px;color:#1e293b;">${item.from}</p>
-          <p style="margin:1px 0;font-size:12px;color:#64748b;font-style:italic;">Re: ${item.subject}</p>
+          <p style="margin:1px 0;font-size:12px;color:#64748b;font-style:italic;">${item.subject}</p>
           <p style="margin:4px 0 2px;font-size:13px;color:#475569;">${item.summary}</p>
-          ${item.actionItems?.length > 0 ? `
-            <div style="margin:4px 0 0 8px;">
-              ${item.actionItems.map((ai: string) => `
-                <p style="margin:1px 0;font-size:12px;color:#dc2626;">→ ${ai}</p>
-              `).join('')}
-            </div>
-          ` : ''}
-        </td></tr>
-      `;
-    }
-  }
-
-  if (otherEmails.length > 0) {
-    html += `<tr><td style="padding:8px 16px 4px;">
-      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">Other Emails</p>
-    </td></tr>`;
-
-    for (const item of otherEmails) {
-      html += `
-        <tr><td style="padding:6px 16px;border-left:3px solid #e2e8f0;">
-          <p style="margin:0;font-weight:600;font-size:13px;color:#64748b;">${item.from}</p>
-          <p style="margin:1px 0;font-size:12px;color:#94a3b8;font-style:italic;">Re: ${item.subject}</p>
-          <p style="margin:4px 0 2px;font-size:13px;color:#94a3b8;">${item.summary}</p>
         </td></tr>
       `;
     }
@@ -121,24 +119,8 @@ function renderEmails(data: any): string {
     </td></tr>`;
   }
 
-  // Action items added to Notion
-  if (aiSummary?.actionItems?.length > 0) {
-    html += `<tr><td style="padding:12px 16px 4px;">
-      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">
-        📋 Action Items${notionItemsAdded ? ` — ${notionItemsAdded} added to your Notion task list` : ''}
-      </p>
-    </td></tr>`;
-    for (const item of aiSummary.actionItems) {
-      html += `
-        <tr><td style="padding:2px 24px;">
-          <p style="margin:0;font-size:13px;color:#dc2626;">☐ ${item}</p>
-        </td></tr>
-      `;
-    }
-  }
-
   // Fallback: show grouped senders if no AI summary
-  if (!aiSummary?.summaries?.length) {
+  if (!aiSummary?.summaries?.length && !aiSummary?.overview) {
     const grouped = data.grouped || {};
     const senders = Object.entries(grouped).slice(0, 15);
     for (const [sender, emails] of senders) {
@@ -169,8 +151,15 @@ function renderCalendar(data: any): string {
   // Today
   html += `<tr><td style="padding:4px 16px;"><strong style="color:#4f46e5;font-size:14px;">Today — ${data.today.date}</strong></td></tr>`;
 
-  if (data.today.events.length === 0) {
-    html += `<tr><td style="padding:2px 32px;font-size:13px;color:#94a3b8;">No events today</td></tr>`;
+  // AI summary for today
+  if (data.aiSummary?.todaySummary) {
+    html += `<tr><td style="padding:4px 16px 8px;">
+      <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">${data.aiSummary.todaySummary}</p>
+    </td></tr>`;
+  }
+
+  if (data.today.events.length === 0 && !data.aiSummary?.todaySummary) {
+    html += `<tr><td style="padding:2px 32px;font-size:13px;color:#94a3b8;">No events today — enjoy the free day!</td></tr>`;
   } else {
     for (const event of data.today.events) {
       const time = event.allDay ? 'All Day' : format(new Date(event.start), 'h:mm a');
@@ -180,7 +169,7 @@ function renderCalendar(data: any): string {
             <span style="color:#6366f1;font-weight:600;">${time}</span> — ${event.summary}
             ${event.location ? `<span style="color:#94a3b8;font-size:11px;"> 📍 ${event.location}</span>` : ''}
           </p>
-          <p style="margin:0;font-size:11px;color:#94a3b8;">${event.account} • ${event.calendar}</p>
+          <p style="margin:0;font-size:11px;color:#94a3b8;">${event.account} &bull; ${event.calendar}</p>
         </td></tr>
       `;
     }
@@ -189,8 +178,15 @@ function renderCalendar(data: any): string {
   // Tomorrow
   html += `<tr><td style="padding:12px 16px 4px;"><strong style="color:#4f46e5;font-size:14px;">Tomorrow — ${data.tomorrow.date}</strong></td></tr>`;
 
-  if (data.tomorrow.events.length === 0) {
-    html += `<tr><td style="padding:2px 32px;font-size:13px;color:#94a3b8;">No events tomorrow</td></tr>`;
+  // AI summary for tomorrow
+  if (data.aiSummary?.tomorrowSummary) {
+    html += `<tr><td style="padding:4px 16px 8px;">
+      <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">${data.aiSummary.tomorrowSummary}</p>
+    </td></tr>`;
+  }
+
+  if (data.tomorrow.events.length === 0 && !data.aiSummary?.tomorrowSummary) {
+    html += `<tr><td style="padding:2px 32px;font-size:13px;color:#94a3b8;">Nothing on the books for tomorrow.</td></tr>`;
   } else {
     for (const event of data.tomorrow.events.slice(0, 5)) {
       const time = event.allDay ? 'All Day' : format(new Date(event.start), 'h:mm a');
@@ -198,7 +194,9 @@ function renderCalendar(data: any): string {
         <tr><td style="padding:4px 32px;">
           <p style="margin:0;font-size:13px;">
             <span style="color:#6366f1;font-weight:600;">${time}</span> — ${event.summary}
+            ${event.location ? `<span style="color:#94a3b8;font-size:11px;"> 📍 ${event.location}</span>` : ''}
           </p>
+          <p style="margin:0;font-size:11px;color:#94a3b8;">${event.account} &bull; ${event.calendar}</p>
         </td></tr>
       `;
     }

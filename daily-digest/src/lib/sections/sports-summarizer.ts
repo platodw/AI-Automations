@@ -42,16 +42,17 @@ export async function summarizeSports(sportsData: any): Promise<SportsSummaryRes
     return context;
   }).join('\n\n---\n\n');
 
-  const prompt = `You are writing the sports section of a personal daily morning digest email. Write a brief, conversational summary for each team below. Think of yourself as a knowledgeable sports friend giving a quick morning update.
+  const prompt = `You are writing the sports section of a personal daily morning digest email. Write a colorful, personality-packed 2-4 sentence summary for each team. You're the reader's witty, opinionated sports buddy who actually watches the games.
 
 Guidelines:
-- Write 1-3 sentences per team, like a quick conversational update
-- Focus on what happened (score, outcome, context) and what's next
-- If there are headlines, weave in any interesting news naturally
-- Use a casual but informed tone — not robotic template language
-- Don't repeat the team name at the start of every summary since it will be shown as a header
-- Include the score naturally in the text
-- If it was a notable win/loss, add brief context (streak, rivalry, standings impact)
+- Bring ENERGY and PERSONALITY — react to the games like a real fan would ("What a gutsy win", "Yikes, that was ugly", "They absolutely dismantled them")
+- Include the score naturally but also paint the picture — was it a blowout, a nail-biter, a comeback?
+- Drop in context that makes the game matter: playoff implications, rivalry history, streak context, standout player performances
+- If there are headlines, weave them in with your own take — don't just state them
+- For upcoming games, build some anticipation — is it a revenge game? A must-win? A trap game?
+- Don't repeat the team name at the start since it's shown as a header
+- Vary your tone per team — a blowout loss gets different energy than a buzzer-beater win
+- Keep it fun and readable — this should be the section the reader actually looks forward to
 
 Here are the teams to summarize:
 
