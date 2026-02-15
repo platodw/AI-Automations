@@ -5,15 +5,29 @@ import { addDays, format } from 'date-fns';
 
 const ACCOUNTS = ['platodw@gmail.com', 'dan@danplato.com'];
 
+function getCredentialsForAccount(account: string) {
+  if (account === 'dan@danplato.com') {
+    return {
+      clientId: process.env.GOOGLE_CLIENT_ID_DAN || process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET_DAN || process.env.GOOGLE_CLIENT_SECRET,
+    };
+  }
+  return {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  };
+}
+
 async function getAuthenticatedClient(account: string) {
   const tokens = await getOAuthTokens('google', account);
   if (!tokens) {
     throw new Error(`No OAuth tokens found for ${account}`);
   }
 
+  const creds = getCredentialsForAccount(account);
   const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
+    creds.clientId,
+    creds.clientSecret,
     process.env.GOOGLE_REDIRECT_URI
   );
 

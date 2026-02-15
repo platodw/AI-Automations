@@ -4,10 +4,26 @@ import { withRetry } from '@/lib/retry';
 
 const ACCOUNTS = ['platodw@gmail.com', 'dan@danplato.com'];
 
-function getOAuth2Client() {
+function getCredentialsForAccount(account: string) {
+  // dan@danplato.com uses its own Google Cloud project credentials
+  if (account === 'dan@danplato.com') {
+    return {
+      clientId: process.env.GOOGLE_CLIENT_ID_DAN || process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET_DAN || process.env.GOOGLE_CLIENT_SECRET,
+    };
+  }
+  // Default credentials (platodw@gmail.com)
+  return {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  };
+}
+
+function getOAuth2Client(account: string = 'platodw@gmail.com') {
+  const creds = getCredentialsForAccount(account);
   return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
+    creds.clientId,
+    creds.clientSecret,
     process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/oauth/google/callback`
   );
 }
@@ -18,7 +34,7 @@ async function getAuthenticatedClient(account: string) {
     throw new Error(`No OAuth tokens found for ${account}. Please complete setup.`);
   }
 
-  const oauth2Client = getOAuth2Client();
+  const oauth2Client = getOAuth2Client(account);
   oauth2Client.setCredentials({
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
@@ -204,7 +220,7 @@ export async function sendDigestEmail(
 }
 
 export function getGoogleAuthUrl(account: string) {
-  const oauth2Client = getOAuth2Client();
+  const oauth2Client = getOAuth2Client(account);
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -218,7 +234,7 @@ export function getGoogleAuthUrl(account: string) {
 }
 
 export async function handleGoogleCallback(code: string, account: string) {
-  const oauth2Client = getOAuth2Client();
+  const oauth2Client = getOAuth2Client(account);
   const { tokens } = await oauth2Client.getToken(code);
 
   await saveOAuthTokens(
