@@ -22,76 +22,100 @@ interface RedditData {
   error?: string;
 }
 
-async function getRedditAccessToken(): Promise<string | null> {
-  const clientId = process.env.REDDIT_CLIENT_ID;
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+function parseRssItems(xml: string): Array<{
+  title: string;
+  link: string;
+  author: string;
+  published: string;
+  content: string;
+}> {
+  const items: Array<{
+    title: string;
+    link: string;
+    author: string;
+    published: string;
+    content: string;
+  }> = [];
 
-  if (!clientId || !clientSecret) return null;
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+  let match;
+  while ((match = entryRegex.exec(xml)) !== null) {
+    const entry = match[1];
 
-  try {
-    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'DailyDigest/1.0',
-      },
-      body: 'grant_type=client_credentials',
+    const getTag = (tag: string) => {
+      const tagMatch = entry.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+      return tagMatch ? tagMatch[1].trim() : '';
+    };
+
+    const getLinkHref = () => {
+      const linkMatch = entry.match(/<link[^>]+href="([^"]+)"/);
+      return linkMatch ? linkMatch[1] : '';
+    };
+
+    items.push({
+      title: getTag('title').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"'),
+      link: getLinkHref(),
+      author: getTag('name'),
+      published: getTag('updated') || getTag('published'),
+      content: getTag('content'),
     });
-
-    if (!res.ok) throw new Error(`Reddit auth error: ${res.status}`);
-    const data = await res.json();
-    return data.access_token;
-  } catch {
-    return null;
   }
+
+  return items;
+}
+
+function extractScoreFromContent(content: string): number {
+  const scoreMatch = content.match(/(\d+)\s+point/);
+  return scoreMatch ? parseInt(scoreMatch[1], 10) : 0;
+}
+
+function extractCommentsFromContent(content: string): number {
+  const commentMatch = content.match(/(\d+)\s+comment/);
+  return commentMatch ? parseInt(commentMatch[1], 10) : 0;
 }
 
 async function fetchSubredditPosts(
   subreddit: string,
-  accessToken: string | null,
   sinceTimestamp: Date
 ): Promise<RedditPost[]> {
-  const cutoffTime = sinceTimestamp.getTime() / 1000;
+  const cutoffTime = sinceTimestamp.getTime();
 
-  const headers: Record<string, string> = {
-    'User-Agent': 'DailyDigest/1.0',
-  };
+  const url = `https://www.reddit.com/r/${subreddit}/hot.rss?limit=25`;
 
-  let url: string;
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-    url = `https://oauth.reddit.com/r/${subreddit}/hot?limit=25`;
-  } else {
-    url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`;
-  }
-
-  const data = await withRetry(
+  const xml = await withRetry(
     async () => {
-      const res = await fetch(url, { headers });
-      if (!res.ok) throw new Error(`Reddit API error: ${res.status}`);
-      return res.json();
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'DailyDigest/1.0 (RSS Reader)',
+          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+        },
+      });
+      if (!res.ok) throw new Error(`Reddit RSS error: ${res.status}`);
+      return res.text();
     },
-    { label: `reddit-${subreddit}`, retries: 2 }
+    { label: `reddit-rss-${subreddit}`, retries: 2 }
   );
 
+  const items = parseRssItems(xml);
   const posts: RedditPost[] = [];
-  for (const child of data.data?.children || []) {
-    const post = child.data;
-    if (post.created_utc < cutoffTime) continue;
-    if (post.stickied) continue;
+
+  for (const item of items) {
+    const publishedTime = item.published ? new Date(item.published).getTime() : 0;
+    if (publishedTime < cutoffTime) continue;
+
+    const permalink = item.link.replace('https://www.reddit.com', '');
 
     posts.push({
-      title: post.title,
-      subreddit: post.subreddit,
-      score: post.score,
-      numComments: post.num_comments,
-      url: post.url,
-      permalink: `https://reddit.com${post.permalink}`,
-      author: post.author,
-      createdUtc: post.created_utc,
-      selfText: post.selftext?.substring(0, 200) || undefined,
-      thumbnail: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : undefined,
+      title: item.title,
+      subreddit,
+      score: extractScoreFromContent(item.content),
+      numComments: extractCommentsFromContent(item.content),
+      url: item.link,
+      permalink: item.link,
+      author: item.author || 'unknown',
+      createdUtc: publishedTime / 1000,
+      selfText: undefined,
+      thumbnail: undefined,
     });
   }
 
@@ -108,12 +132,10 @@ export async function fetchReddit(sinceTimestamp: Date): Promise<RedditData> {
     return { subreddits: [], error: 'No subreddits configured' };
   }
 
-  const accessToken = await getRedditAccessToken();
-
   const results = await Promise.allSettled(
     subreddits.map(async (sub) => ({
       name: sub,
-      posts: await fetchSubredditPosts(sub, accessToken, sinceTimestamp),
+      posts: await fetchSubredditPosts(sub, sinceTimestamp),
     }))
   );
 
