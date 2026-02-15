@@ -57,7 +57,7 @@ function errorSection(sectionName: string, error: string): string {
 
 function renderEmails(data: any): string {
   if (!data) return '';
-  const { accounts, grouped, totalUnread } = data;
+  const { accounts, totalUnread, aiSummary, notionItemsAdded } = data;
 
   let html = sectionHeader(`Email Summary (${totalUnread} unread)`, '📧');
 
@@ -71,22 +71,63 @@ function renderEmails(data: any): string {
     `;
   }
 
-  // Grouped by sender
-  const senders = Object.entries(grouped || {}).slice(0, 15);
-  for (const [sender, emails] of senders) {
-    const emailList = emails as any[];
-    html += `
-      <tr><td style="padding:8px 16px;border-left:3px solid #6366f1;margin:4px 0;">
-        <p style="margin:0;font-weight:600;font-size:14px;color:#1e293b;">${sender} (${emailList.length})</p>
-        ${emailList.slice(0, 3).map((e: any) => `
-          <p style="margin:2px 0 2px 12px;font-size:13px;color:#475569;">
-            • ${e.subject}
-            <span style="color:#94a3b8;font-size:11px;"> — ${e.snippet.substring(0, 80)}${e.snippet.length > 80 ? '...' : ''}</span>
-          </p>
-        `).join('')}
-        ${emailList.length > 3 ? `<p style="margin:2px 0 2px 12px;font-size:12px;color:#94a3b8;">...and ${emailList.length - 3} more</p>` : ''}
-      </td></tr>
-    `;
+  // AI Summaries
+  if (aiSummary?.summaries?.length > 0) {
+    html += `<tr><td style="padding:8px 16px 4px;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">Key Emails</p>
+    </td></tr>`;
+
+    for (const item of aiSummary.summaries) {
+      html += `
+        <tr><td style="padding:6px 16px;border-left:3px solid #6366f1;">
+          <p style="margin:0;font-weight:600;font-size:13px;color:#1e293b;">${item.from}</p>
+          <p style="margin:1px 0;font-size:12px;color:#64748b;font-style:italic;">Re: ${item.subject}</p>
+          <p style="margin:4px 0 2px;font-size:13px;color:#475569;">${item.summary}</p>
+          ${item.actionItems?.length > 0 ? `
+            <div style="margin:4px 0 0 8px;">
+              ${item.actionItems.map((ai: string) => `
+                <p style="margin:1px 0;font-size:12px;color:#dc2626;">→ ${ai}</p>
+              `).join('')}
+            </div>
+          ` : ''}
+        </td></tr>
+      `;
+    }
+  }
+
+  // Action items added to Notion
+  if (aiSummary?.actionItems?.length > 0) {
+    html += `<tr><td style="padding:12px 16px 4px;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;">Action Items${notionItemsAdded ? ` (${notionItemsAdded} added to Notion)` : ''}</p>
+    </td></tr>`;
+    for (const item of aiSummary.actionItems) {
+      html += `
+        <tr><td style="padding:2px 24px;">
+          <p style="margin:0;font-size:13px;color:#dc2626;">☐ ${item}</p>
+        </td></tr>
+      `;
+    }
+  }
+
+  // Fallback: show grouped senders if no AI summary
+  if (!aiSummary?.summaries?.length) {
+    const grouped = data.grouped || {};
+    const senders = Object.entries(grouped).slice(0, 15);
+    for (const [sender, emails] of senders) {
+      const emailList = emails as any[];
+      html += `
+        <tr><td style="padding:8px 16px;border-left:3px solid #6366f1;margin:4px 0;">
+          <p style="margin:0;font-weight:600;font-size:14px;color:#1e293b;">${sender} (${emailList.length})</p>
+          ${emailList.slice(0, 3).map((e: any) => `
+            <p style="margin:2px 0 2px 12px;font-size:13px;color:#475569;">
+              • ${e.subject}
+              <span style="color:#94a3b8;font-size:11px;"> — ${e.snippet.substring(0, 80)}${e.snippet.length > 80 ? '...' : ''}</span>
+            </p>
+          `).join('')}
+          ${emailList.length > 3 ? `<p style="margin:2px 0 2px 12px;font-size:12px;color:#94a3b8;">...and ${emailList.length - 3} more</p>` : ''}
+        </td></tr>
+      `;
+    }
   }
 
   return html;
@@ -245,32 +286,61 @@ function renderNews(data: any): string {
   return html;
 }
 
+function formatGameSummary(team: any): string | null {
+  const parts: string[] = [];
+
+  if (team.lastGame) {
+    const g = team.lastGame;
+    const isHome = g.homeTeam.toLowerCase().includes(team.name.split(' ').pop()?.toLowerCase() || '');
+    const teamScore = isHome ? g.homeScore : g.awayScore;
+    const oppScore = isHome ? g.awayScore : g.homeScore;
+    const opponent = isHome ? g.awayTeam : g.homeTeam;
+    const location = isHome ? 'vs' : 'at';
+
+    if (teamScore !== null && oppScore !== null) {
+      const won = teamScore > oppScore;
+      const verb = won ? 'defeated' : 'fell to';
+      parts.push(`${verb} ${opponent} ${Math.max(teamScore, oppScore)}-${Math.min(teamScore, oppScore)} ${location === 'at' ? `on the road` : `at home`}`);
+    } else {
+      parts.push(`played ${opponent} (${g.status})`);
+    }
+  }
+
+  if (team.nextGame) {
+    const g = team.nextGame;
+    const isHome = g.homeTeam.toLowerCase().includes(team.name.split(' ').pop()?.toLowerCase() || '');
+    const opponent = isHome ? g.awayTeam : g.homeTeam;
+    const where = isHome ? 'host' : 'visit';
+    parts.push(`Next up: ${where} ${opponent} on ${g.date}`);
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join('. ') + '.';
+}
+
 function renderSports(data: any): string {
   if (!data) return '';
 
+  // Filter to only teams with games to report
+  const teamsWithGames = (data.teams || []).filter(
+    (team: any) => team.lastGame || team.nextGame
+  );
+
+  if (teamsWithGames.length === 0) {
+    return sectionHeader('Sports', '🏀') +
+      `<tr><td style="padding:8px 16px;font-size:13px;color:#94a3b8;">No recent games or upcoming matchups to report.</td></tr>`;
+  }
+
   let html = sectionHeader('Sports', '🏀');
 
-  for (const team of data.teams || []) {
-    html += `<tr><td style="padding:6px 16px;border-bottom:1px solid #f1f5f9;">
-      <p style="margin:0;font-size:14px;font-weight:600;color:#1e293b;">${team.name}${team.record ? ` <span style="font-weight:400;color:#64748b;font-size:12px;">(${team.record})</span>` : ''}</p>`;
+  for (const team of teamsWithGames) {
+    const summary = formatGameSummary(team);
+    if (!summary) continue;
 
-    if (team.lastGame) {
-      const g = team.lastGame;
-      html += `<p style="margin:2px 0 2px 12px;font-size:12px;color:#475569;">
-        Last: ${g.awayTeam} ${g.awayScore ?? '-'} @ ${g.homeTeam} ${g.homeScore ?? '-'} — <span style="color:#6366f1;">${g.status}</span>
-      </p>`;
-    }
-    if (team.nextGame) {
-      const g = team.nextGame;
-      html += `<p style="margin:2px 0 2px 12px;font-size:12px;color:#475569;">
-        Next: ${g.awayTeam} @ ${g.homeTeam} — <span style="color:#6366f1;">${g.date}</span>
-      </p>`;
-    }
-    if (!team.lastGame && !team.nextGame) {
-      html += `<p style="margin:2px 0 2px 12px;font-size:12px;color:#94a3b8;">No recent or upcoming games found</p>`;
-    }
-
-    html += `</td></tr>`;
+    html += `<tr><td style="padding:8px 16px;border-bottom:1px solid #f1f5f9;">
+      <p style="margin:0;font-size:14px;font-weight:600;color:#1e293b;">${team.name}${team.record ? ` <span style="font-weight:400;color:#64748b;font-size:12px;">(${team.record})</span>` : ''}</p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:#475569;line-height:1.4;">${summary}</p>
+    </td></tr>`;
   }
 
   return html;
@@ -381,8 +451,9 @@ function renderReddit(data: any): string {
 
 export function generateDigestHtml(content: DigestContent, enabledSections: Record<string, boolean>): string {
   const now = new Date();
-  const dateStr = format(now, 'EEEE, MMMM d, yyyy');
-  const isFriday = now.getDay() === 5;
+  const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const dateStr = format(nowET, 'EEEE, MMMM d, yyyy');
+  const isFriday = nowET.getDay() === 5;
 
   let sectionsHtml = '';
   const errors = content.errors || {};

@@ -38,6 +38,36 @@ async function getAuthenticatedClient(account: string) {
   return oauth2Client;
 }
 
+function extractBody(payload: any): string {
+  if (!payload) return '';
+
+  // Direct body data
+  if (payload.body?.data) {
+    return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+  }
+
+  // Multipart - look for text/plain first, then text/html
+  if (payload.parts) {
+    const textPart = payload.parts.find((p: any) => p.mimeType === 'text/plain');
+    if (textPart?.body?.data) {
+      return Buffer.from(textPart.body.data, 'base64').toString('utf-8');
+    }
+    const htmlPart = payload.parts.find((p: any) => p.mimeType === 'text/html');
+    if (htmlPart?.body?.data) {
+      const html = Buffer.from(htmlPart.body.data, 'base64').toString('utf-8');
+      // Strip HTML tags for a rough plaintext version
+      return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    // Nested multipart
+    for (const part of payload.parts) {
+      const nested = extractBody(part);
+      if (nested) return nested;
+    }
+  }
+
+  return '';
+}
+
 export async function fetchEmails(sinceTimestamp: Date) {
   const results: Array<{
     account: string;
@@ -46,6 +76,7 @@ export async function fetchEmails(sinceTimestamp: Date) {
       from: string;
       subject: string;
       snippet: string;
+      body: string;
       date: string;
     }>;
     error?: string;
@@ -76,20 +107,21 @@ export async function fetchEmails(sinceTimestamp: Date) {
           const detail = await gmail.users.messages.get({
             userId: 'me',
             id: msg.id!,
-            format: 'metadata',
-            metadataHeaders: ['From', 'Subject', 'Date'],
+            format: 'full',
           });
 
           const headers = detail.data.payload?.headers || [];
-          const from = headers.find((h) => h.name === 'From')?.value || 'Unknown';
-          const subject = headers.find((h) => h.name === 'Subject')?.value || '(no subject)';
-          const date = headers.find((h) => h.name === 'Date')?.value || '';
+          const from = headers.find((h: any) => h.name === 'From')?.value || 'Unknown';
+          const subject = headers.find((h: any) => h.name === 'Subject')?.value || '(no subject)';
+          const date = headers.find((h: any) => h.name === 'Date')?.value || '';
+          const body = extractBody(detail.data.payload);
 
           emails.push({
             id: msg.id!,
             from,
             subject,
             snippet: detail.data.snippet || '',
+            body: body.substring(0, 3000),
             date,
           });
         } catch {
@@ -130,6 +162,7 @@ export async function fetchEmails(sinceTimestamp: Date) {
     })),
     grouped,
     totalUnread: results.reduce((sum, r) => sum + r.emails.length, 0),
+    raw: results,
   };
 }
 

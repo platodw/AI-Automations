@@ -8,6 +8,8 @@ import { fetchSports } from '@/lib/sections/sports';
 import { fetchAnthropicBilling } from '@/lib/sections/anthropic-billing';
 import { fetchDiscordUpdates } from '@/lib/sections/discord';
 import { fetchReddit } from '@/lib/sections/reddit';
+import { summarizeEmails } from '@/lib/sections/ai-summarizer';
+import { addActionItems } from '@/lib/sections/notion';
 import { generateDigestHtml } from '@/lib/email-template';
 import { format, subHours } from 'date-fns';
 
@@ -71,7 +73,8 @@ export async function compileAndSendDigest(): Promise<{
     reddit: config.section_reddit !== 'false',
   };
 
-  const isFriday = new Date().getDay() === 5;
+  const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const isFriday = nowET.getDay() === 5;
 
   // Fetch all sections in parallel
   const sectionPromises: Promise<SectionResult>[] = [];
@@ -136,12 +139,51 @@ export async function compileAndSendDigest(): Promise<{
     }
   }
 
+  // AI-summarize emails and add action items to Notion
+  if (content.emails && !errors.emails) {
+    try {
+      const allEmails = [];
+      for (const result of content.emails.raw || []) {
+        for (const email of result.emails || []) {
+          allEmails.push({
+            from: email.from,
+            subject: email.subject,
+            body: email.body || email.snippet || '',
+            date: email.date,
+            account: result.account,
+          });
+        }
+      }
+
+      if (allEmails.length > 0) {
+        const summary = await summarizeEmails(allEmails);
+        content.emails.aiSummary = summary;
+
+        // Add action items to Notion
+        if (summary.actionItems.length > 0) {
+          try {
+            const added = await addActionItems(
+              summary.actionItems.map((item) => ({ title: item, category: 'Personal' }))
+            );
+            content.emails.notionItemsAdded = added;
+            console.log(`[Digest] Added ${added} action items to Notion`);
+          } catch (notionErr) {
+            console.error('[Digest] Notion action items failed:', notionErr);
+          }
+        }
+      }
+    } catch (aiErr) {
+      console.error('[Digest] Email AI summarization failed:', aiErr);
+      errors.emailSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+    }
+  }
+
   content.errors = errors;
   content.generatedAt = new Date().toISOString();
 
   // Generate email HTML
   const html = generateDigestHtml(content, enabledSections);
-  const subject = `☀️ Daily Digest — ${format(new Date(), 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
+  const subject = `☀️ Daily Digest — ${format(nowET, 'EEEE, MMM d')}${isFriday ? ' (Weekly Summary)' : ''}`;
 
   // Send email
   let sendError: string | null = null;
@@ -193,7 +235,8 @@ export async function previewDigest(): Promise<{ html: string; content: Record<s
     reddit: config.section_reddit !== 'false',
   };
 
-  const isFriday = new Date().getDay() === 5;
+  const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const isFriday = nowET.getDay() === 5;
 
   const fetchers: Record<string, () => Promise<any>> = {
     emails: () => fetchEmails(sinceTimestamp),

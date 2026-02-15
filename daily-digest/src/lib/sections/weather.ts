@@ -1,10 +1,10 @@
 import { withRetry } from '@/lib/retry';
 
-const CITY = 'Highland Heights';
+const CITY = 'Lyndhurst';
 const STATE = 'OH';
 const COUNTRY = 'US';
-const LAT = 41.5515;
-const LON = -81.4590;
+const LAT = 41.5190;
+const LON = -81.4884;
 
 interface WeatherData {
   current: {

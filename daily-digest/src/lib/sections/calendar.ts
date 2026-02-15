@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { getOAuthTokens, saveOAuthTokens } from '@/lib/db';
 import { withRetry } from '@/lib/retry';
-import { startOfDay, endOfDay, addDays, format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 
 const ACCOUNTS = ['platodw@gmail.com', 'dan@danplato.com'];
 
@@ -47,10 +47,34 @@ interface CalendarEvent {
   allDay: boolean;
 }
 
+function toEastern(date: Date): Date {
+  const eastern = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  return eastern;
+}
+
+function startOfDayET(date: Date): Date {
+  const eastern = toEastern(date);
+  eastern.setHours(0, 0, 0, 0);
+  // Convert back to UTC by finding the offset
+  const utcStr = date.toLocaleString('en-US', { timeZone: 'UTC' });
+  const etStr = date.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const offsetMs = new Date(utcStr).getTime() - new Date(etStr).getTime();
+  return new Date(eastern.getTime() + offsetMs);
+}
+
+function endOfDayET(date: Date): Date {
+  const eastern = toEastern(date);
+  eastern.setHours(23, 59, 59, 999);
+  const utcStr = date.toLocaleString('en-US', { timeZone: 'UTC' });
+  const etStr = date.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const offsetMs = new Date(utcStr).getTime() - new Date(etStr).getTime();
+  return new Date(eastern.getTime() + offsetMs);
+}
+
 export async function fetchCalendarEvents() {
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const tomorrowEnd = endOfDay(addDays(now, 1));
+  const todayStart = startOfDayET(now);
+  const tomorrowEnd = endOfDayET(addDays(todayStart, 1));
 
   const todayEvents: CalendarEvent[] = [];
   const tomorrowEvents: CalendarEvent[] = [];
@@ -97,7 +121,7 @@ export async function fetchCalendarEvents() {
               allDay: isAllDay,
             };
 
-            const todayEnd = endOfDay(now);
+            const todayEnd = endOfDayET(now);
             if (eventStart <= todayEnd) {
               todayEvents.push(calEvent);
             } else {
@@ -123,13 +147,17 @@ export async function fetchCalendarEvents() {
       return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
+  const nowET = toEastern(now);
+  const tomorrowET = new Date(nowET);
+  tomorrowET.setDate(tomorrowET.getDate() + 1);
+
   return {
     today: {
-      date: format(now, 'EEEE, MMMM d, yyyy'),
+      date: format(nowET, 'EEEE, MMMM d, yyyy'),
       events: sortEvents(todayEvents),
     },
     tomorrow: {
-      date: format(addDays(now, 1), 'EEEE, MMMM d, yyyy'),
+      date: format(tomorrowET, 'EEEE, MMMM d, yyyy'),
       events: sortEvents(tomorrowEvents),
     },
     errors,
