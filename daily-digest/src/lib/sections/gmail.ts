@@ -141,14 +141,17 @@ export async function sendDigestEmail(
   const auth = await getAuthenticatedClient('platodw@gmail.com');
   const gmail = google.gmail({ version: 'v1', auth });
 
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
+
   const rawMessage = [
     `From: james@danplato.com`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodedSubject}`,
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
+    `Content-Transfer-Encoding: base64`,
     '',
-    htmlContent,
+    Buffer.from(htmlContent).toString('base64'),
   ].join('\r\n');
 
   const encodedMessage = Buffer.from(rawMessage)
