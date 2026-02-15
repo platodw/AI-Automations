@@ -71,11 +71,19 @@ Your response MUST include:
 2. **accountBreakdowns**: For EACH email account, write 1-2 sentences describing what came into that specific account. Be specific — mention key senders and topics ("Your dan@danplato.com inbox got a client follow-up from James about the proposal deadline and a couple of newsletters").
 
 3. **summaries**: For each email, provide:
-   - Priority: "high" for anything needing a response, containing deadlines, bills, appointments, or follow-ups. "low" for newsletters, promos, automated notifications.
+   - Priority: "high" for anything needing a response, containing deadlines, bills, appointments, follow-ups, registrations, forms to complete, RSVPs, renewals, or signups. "low" for newsletters, promos, automated notifications with no action needed.
    - A 1-2 sentence summary of key points (for high priority)
    - Specific action items (for high priority)
 
-4. **actionItems**: A combined flat list of ALL action items with enough context to stand alone (these get added to Notion). Write them as clear tasks like "Reply to James about the proposal deadline (from dan@danplato.com)" — not vague things like "respond to email".
+   CRITICAL: Emails from schools, doctors, banks, insurers, government, or any organization asking you to complete a form, register, enroll, renew, sign up, confirm, or take action by a deadline are ALWAYS high priority. Even if the email is short or automated-looking, if there's a deadline or a link to complete something, it's high priority with an action item.
+
+   Examples of emails that MUST be high priority:
+   - "Please complete the 2026-27 enrollment form by Feb 27" → action item: "Complete Gesu 2026-27 enrollment form by Feb 27 (link in email from mmartinek@mail.digitalacademy.org)"
+   - "Your auto insurance renewal is due March 1" → action item
+   - "Please RSVP for the school fundraiser by Friday" → action item
+   - "Your prescription is ready for pickup" → action item
+
+4. **actionItems**: A combined flat list of ALL action items with enough context to stand alone (these get added to Notion). Write them as clear tasks like "Reply to James about the proposal deadline (from dan@danplato.com)" — not vague things like "respond to email". Always include the deadline date if one is mentioned in the email.
 
 5. **lowPriorityNote**: A friendly sentence about the unimportant emails ("The rest is the usual — a couple newsletters from Morning Brew and The Hustle, and some promotional stuff. Nothing you need to deal with.")
 
