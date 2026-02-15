@@ -4,9 +4,10 @@ const $ = (sel) => document.querySelector(sel);
 
 const statusDot = $('#status-dot');
 const statusText = $('#status-text');
-const tokenInput = $('#token-input');
-const saveTokenBtn = $('#save-token-btn');
+const authConnected = $('#auth-connected');
+const authDisconnected = $('#auth-disconnected');
 const logoutBtn = $('#logout-btn');
+const openAppBtn = $('#open-app-btn');
 const authMessage = $('#auth-message');
 const itemsSection = $('#items-section');
 const itemsList = $('#items-list');
@@ -18,19 +19,16 @@ function setAuthState(authenticated) {
   if (authenticated) {
     statusDot.className = 'status-dot on';
     statusText.textContent = 'Connected';
-    tokenInput.style.display = 'none';
-    saveTokenBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
+    authConnected.style.display = 'block';
+    authDisconnected.style.display = 'none';
     itemsSection.style.display = 'block';
     loadPendingItems();
   } else {
     statusDot.className = 'status-dot off';
     statusText.textContent = 'Not connected';
-    tokenInput.style.display = 'block';
-    saveTokenBtn.style.display = 'inline-block';
-    logoutBtn.style.display = 'none';
+    authConnected.style.display = 'none';
+    authDisconnected.style.display = 'block';
     itemsSection.style.display = 'none';
-    tokenInput.value = '';
   }
 }
 
@@ -45,21 +43,10 @@ chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' }, (response) => {
   setAuthState(response && response.authenticated);
 });
 
-// Save token
-saveTokenBtn.addEventListener('click', () => {
-  const token = tokenInput.value.trim();
-  if (!token) {
-    showMessage(authMessage, 'Please enter a token', 'error');
-    return;
-  }
-  chrome.runtime.sendMessage({ type: 'SET_AUTH_TOKEN', token }, (response) => {
-    if (response && response.success) {
-      showMessage(authMessage, 'Token saved', 'success');
-      setAuthState(true);
-    } else {
-      showMessage(authMessage, 'Failed to save token', 'error');
-    }
-  });
+// Open STBF app to trigger auto-connect
+openAppBtn.addEventListener('click', () => {
+  chrome.tabs.create({ url: 'https://stbf.lovable.app/' });
+  showMessage(authMessage, 'Opening STBF app — token will sync automatically', 'success');
 });
 
 // Logout

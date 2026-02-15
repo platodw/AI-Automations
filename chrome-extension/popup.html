@@ -42,18 +42,6 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    input[type="text"] {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 12px;
-      font-family: monospace;
-    }
-    input[type="text"]:focus {
-      outline: none;
-      border-color: #7b2d8e;
-    }
     .btn {
       display: inline-block;
       padding: 6px 14px;
@@ -81,12 +69,16 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
-    .auth-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
+    .auth-hint {
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
     }
-    .auth-row input { flex: 1; }
+    .auth-hint a {
+      color: #7b2d8e;
+      text-decoration: none;
+    }
+    .auth-hint a:hover { text-decoration: underline; }
     .items-list {
       max-height: 300px;
       overflow-y: auto;
@@ -150,14 +142,17 @@
 
   <div class="section" id="auth-section">
     <div class="section-title">Authentication</div>
-    <p style="font-size:11px; color:#888; margin-bottom:6px;">
-      Paste your Supabase JWT from the STBF app console
-    </p>
-    <div class="auth-row">
-      <input type="text" id="token-input" placeholder="eyJhbGciOi..." />
-      <button class="btn btn-primary btn-sm" id="save-token-btn">Save</button>
+    <div id="auth-connected" style="display:none;">
+      <p class="auth-hint" style="color:#4caf50; font-weight:500;">Auto-connected via STBF app</p>
+      <button class="btn btn-danger btn-sm" id="logout-btn" style="margin-top:8px;">Logout</button>
     </div>
-    <button class="btn btn-danger btn-sm" id="logout-btn" style="margin-top:8px; display:none;">Logout</button>
+    <div id="auth-disconnected">
+      <p class="auth-hint">
+        Open your STBF app to auto-connect. The extension will automatically
+        grab your login token when you visit the app.
+      </p>
+      <button class="btn btn-primary btn-sm" id="open-app-btn" style="margin-top:8px;">Open STBF App</button>
+    </div>
     <div id="auth-message"></div>
   </div>
 
