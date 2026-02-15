@@ -7,8 +7,9 @@ export async function ensureDatabase() {
   try {
     await initializeDatabase();
     dbInitialized = true;
-  } catch {
-    // DB may not be configured yet — skip silently
+    console.log('[DB] Database initialized successfully');
+  } catch (error) {
+    console.error('[DB] Failed to initialize database:', error instanceof Error ? error.message : error);
   }
 }
 
@@ -157,6 +158,7 @@ export async function saveOAuthTokens(
   refreshToken: string | null,
   expiresAt: Date | null
 ): Promise<void> {
+  await ensureDatabase();
   await sql`
     INSERT INTO oauth_tokens (service, account, access_token, refresh_token, expires_at, updated_at)
     VALUES (${service}, ${account}, ${accessToken}, ${refreshToken}, ${expiresAt?.toISOString() ?? null}, NOW())
@@ -171,12 +173,15 @@ export async function saveOAuthTokens(
 
 export async function getOAuthTokens(service: string, account: string) {
   try {
+    await ensureDatabase();
     const result = await sql`
       SELECT * FROM oauth_tokens
       WHERE service = ${service} AND account = ${account}
     `;
+    console.log(`[DB] getOAuthTokens(${service}, ${account}): ${result.rows.length > 0 ? 'found' : 'not found'}`);
     return result.rows[0] ?? null;
-  } catch {
+  } catch (error) {
+    console.error(`[DB] getOAuthTokens error for ${service}/${account}:`, error instanceof Error ? error.message : error);
     return null;
   }
 }
