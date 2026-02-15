@@ -1,10 +1,88 @@
 // Content script for Poshmark create-listing page
 // Auto-fills listing form with item data from STBF
+// Uses Vue.js-compatible selectors and native value setters for reactivity
 
 (function () {
   'use strict';
 
   const LOG_PREFIX = '[STBF→Poshmark]';
+  const MAX_PHOTOS = 16;
+  const VUE_HYDRATION_DELAY = 1500;
+
+  // --- Field Selector Maps ---
+  // Each field has an array of selectors tried in order (primary Vue selectors first, then fallbacks)
+
+  const FIELD_SELECTORS = {
+    title: [
+      "input[data-vv-name='title']",
+      "input[name='title']",
+      "input[id='title']",
+      "input[data-testid='title']",
+      "input[data-testid='TextInput-listingTitle']",
+      "input[placeholder*='itle']",
+      "#listing-title input"
+    ],
+    brand: [
+      "input[placeholder='Enter the Brand/Designer']",
+      "input[data-vv-name='brand']",
+      "input[name='brand']",
+      "input[id='brand']",
+      "input[data-testid='brand']",
+      "input[data-testid='TextInput-listingBrand']",
+      "input[placeholder*='rand']",
+      "#listing-brand input"
+    ],
+    originalPrice: [
+      "input[data-vv-name='originalPrice']",
+      "input[name='originalPrice']",
+      "input[id='originalPrice']",
+      "input[data-testid='originalPrice']",
+      "input[data-testid='TextInput-originalPrice']",
+      "input[placeholder*='riginal']",
+      "input[placeholder*='MSRP']",
+      "input[placeholder*='Retail']"
+    ],
+    listingPrice: [
+      "input[data-vv-name='listingPrice']",
+      "input[name='listingPrice']",
+      "input[id='listingPrice']",
+      "input[data-testid='listingPrice']",
+      "input[data-testid='TextInput-listingPrice']",
+      "input[placeholder*='isting']",
+      "input[placeholder*='rice']"
+    ],
+    description: [
+      "textarea[data-vv-name='description']",
+      "textarea[name='description']",
+      "textarea[id='description']",
+      "textarea[data-testid='description']",
+      "textarea[data-testid='TextInput-listingDescription']",
+      "textarea[placeholder*='escri']",
+      "#listing-description textarea"
+    ],
+    size: [
+      "input[data-vv-name='size']",
+      "input[name='size']",
+      "input[placeholder*='ize']"
+    ],
+    styleTags: [
+      "input[data-vv-name='styleTags']",
+      "input[data-testid='TextInput-styleTags']",
+      "input[name='styleTags']",
+      "input[placeholder*='tyle']"
+    ]
+  };
+
+  // Selectors that indicate the Poshmark create-listing form is present
+  const FORM_DETECTION_SELECTORS = [
+    "input[data-vv-name='title']",
+    "input[data-testid='TextInput-listingTitle']",
+    "input[name='title']",
+    "input[placeholder*='itle']",
+    "#listing-title input",
+    "form[name='listingForm']",
+    ".listing-editor"
+  ];
 
   // --- Utilities ---
 
@@ -16,24 +94,42 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Set a value on an input/textarea and dispatch events so React picks it up
+  /**
+   * Find the first matching element from an array of selectors.
+   */
+  function queryFirst(selectors, root = document) {
+    for (const sel of selectors) {
+      const el = root.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  /**
+   * Set a value on an input or textarea using the native setter to trigger Vue reactivity.
+   * Uses HTMLInputElement setter for inputs, HTMLTextAreaElement setter for textareas.
+   */
   function setNativeValue(el, value) {
-    if (!el || !value) return false;
-    const nativeInputValueSetter =
-      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
-      Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-    if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(el, value);
+    if (!el || value == null) return false;
+
+    const isTextarea = el.tagName.toLowerCase() === 'textarea';
+    const proto = isTextarea
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+
+    if (nativeSetter) {
+      nativeSetter.call(el, value);
     } else {
       el.value = value;
     }
+
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
     el.dispatchEvent(new Event('blur', { bubbles: true }));
     return true;
   }
 
-  // Click an element
   function click(el) {
     if (!el) return false;
     el.scrollIntoView({ block: 'center' });
@@ -41,7 +137,6 @@
     return true;
   }
 
-  // Wait for an element matching a selector to appear
   async function waitFor(selector, timeout = 5000, root = document) {
     const start = Date.now();
     while (Date.now() - start < timeout) {
@@ -52,14 +147,25 @@
     return null;
   }
 
-  // Find an element by its visible text content
+  /**
+   * Wait for any one of an array of selectors to match.
+   */
+  async function waitForAny(selectors, timeout = 10000) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const el = queryFirst(selectors);
+      if (el) return el;
+      await sleep(200);
+    }
+    return null;
+  }
+
   function findByText(selector, text, parent = document) {
     const els = parent.querySelectorAll(selector);
     const lowerText = text.toLowerCase().trim();
     for (const el of els) {
       if (el.textContent.trim().toLowerCase() === lowerText) return el;
     }
-    // Partial match fallback
     for (const el of els) {
       if (el.textContent.trim().toLowerCase().includes(lowerText)) return el;
     }
@@ -87,9 +193,7 @@
     return CONDITION_MAP[condition.toLowerCase().trim()] || 'good';
   }
 
-  // --- Poshmark Category Mapping ---
-  // Poshmark uses a tree: Department → Category → Subcategory
-  // We do best-effort matching based on the item's category/department fields
+  // --- Poshmark Category / Department ---
 
   const DEPARTMENT_KEYWORDS = {
     women: ['women', 'woman', 'womens', "women's", 'ladies', 'female'],
@@ -101,11 +205,10 @@
     const dept = (item.department || '').toLowerCase();
     const cat = (item.category || '').toLowerCase();
     const combined = `${dept} ${cat}`;
-
     for (const [key, keywords] of Object.entries(DEPARTMENT_KEYWORDS)) {
       if (keywords.some((kw) => combined.includes(kw))) return key;
     }
-    return 'women'; // default
+    return 'women';
   }
 
   // --- Main Form Filler ---
@@ -113,11 +216,12 @@
   async function fillListingForm(item) {
     log('Starting form fill for:', item.title);
 
-    // Wait for the page to load
-    await sleep(2000);
+    // Vue hydration delay — let Poshmark's Vue.js finish binding to the DOM
+    log(`Waiting ${VUE_HYDRATION_DELAY}ms for Vue hydration...`);
+    await sleep(VUE_HYDRATION_DELAY);
 
     // --- Title ---
-    await fillTitle(item.title);
+    await fillField('title', item.title, 80);
 
     // --- Description ---
     await fillDescription(item);
@@ -138,11 +242,11 @@
     // --- Condition ---
     await fillCondition(item.condition);
 
-    // --- Original Price (MSRP) ---
-    await fillOriginalPrice(item.original_price);
+    // --- Original Price (MSRP) --- mapped from item.original_price
+    await fillPriceField('originalPrice', item.original_price);
 
-    // --- Listing Price ---
-    await fillListingPrice(item.price);
+    // --- Listing Price --- mapped from item.price
+    await fillPriceField('listingPrice', item.price);
 
     // --- Style Tags ---
     await fillStyleTags(item.style_tags);
@@ -154,23 +258,28 @@
     showNotification('Form auto-filled! Review the details and upload photos if needed, then submit.');
   }
 
-  async function fillTitle(title) {
-    if (!title) return;
-    const input = document.querySelector('input[data-testid="TextInput-listingTitle"]')
-      || document.querySelector('#listing-title input')
-      || document.querySelector('input[placeholder*="itle"]')
-      || document.querySelector('input[name="title"]');
-    if (input) {
-      setNativeValue(input, title.substring(0, 80)); // Poshmark 80 char limit
-      log('Title set');
+  /**
+   * Generic field filler: finds element via FIELD_SELECTORS[fieldName] and sets its value.
+   */
+  async function fillField(fieldName, value, maxLength) {
+    if (!value) return;
+    const selectors = FIELD_SELECTORS[fieldName];
+    if (!selectors) {
+      log(`No selectors defined for field: ${fieldName}`);
+      return;
+    }
+    const el = queryFirst(selectors);
+    if (el) {
+      const trimmed = maxLength ? String(value).substring(0, maxLength) : String(value);
+      setNativeValue(el, trimmed);
+      log(`${fieldName} set`);
     } else {
-      log('Title input not found');
+      log(`${fieldName} input not found`);
     }
   }
 
   async function fillDescription(item) {
     let desc = item.description || '';
-    // Append extra details
     const extras = [];
     if (item.material) extras.push(`Material: ${item.material}`);
     if (item.measurements) extras.push(`Measurements: ${item.measurements}`);
@@ -183,10 +292,7 @@
       desc += '\n\n' + extras.join('\n');
     }
 
-    const textarea = document.querySelector('textarea[data-testid="TextInput-listingDescription"]')
-      || document.querySelector('#listing-description textarea')
-      || document.querySelector('textarea[placeholder*="escri"]')
-      || document.querySelector('textarea[name="description"]');
+    const textarea = queryFirst(FIELD_SELECTORS.description);
     if (textarea) {
       setNativeValue(textarea, desc);
       log('Description set');
@@ -199,7 +305,6 @@
     const department = detectDepartment(item);
     const category = item.category || '';
 
-    // Click the category selector to open the picker
     const categoryBtn = document.querySelector('[data-testid="ListingCategory-btn"]')
       || document.querySelector('.listing-editor__category')
       || findByText('button', 'Category')
@@ -207,14 +312,13 @@
       || findByText('a', 'Category');
 
     if (!categoryBtn) {
-      log('Category button not found - user should select manually');
+      log('Category button not found — user should select manually');
       return;
     }
 
     click(categoryBtn);
     await sleep(800);
 
-    // Step 1: Select department
     const deptEl = findByText('li, div[role="option"], button, a', department);
     if (deptEl) {
       click(deptEl);
@@ -222,20 +326,15 @@
       await sleep(600);
     }
 
-    // Step 2: Try to select the category
     if (category) {
-      // Try direct match first
       const catEl = findByText('li, div[role="option"], button, a', category);
       if (catEl) {
         click(catEl);
         log('Category selected:', category);
         await sleep(600);
 
-        // Step 3: If there's a subcategory level, try to pick something reasonable
-        // Just look for any selectable item and skip if it's too ambiguous
         const subItems = document.querySelectorAll('li[role="option"], div[role="option"]');
         if (subItems.length > 0 && subItems.length < 30) {
-          // Try to find "Other" as a safe default subcategory
           const otherEl = findByText('li, div[role="option"], button, a', 'Other');
           if (otherEl) {
             click(otherEl);
@@ -247,7 +346,6 @@
       }
     }
 
-    // Close picker if still open (press Escape)
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await sleep(300);
   }
@@ -255,7 +353,6 @@
   async function fillSize(size) {
     if (!size) return;
 
-    // Poshmark size selector — look for buttons/options with size text
     const sizeBtn = document.querySelector('[data-testid="ListingSize-btn"]')
       || findByText('button', 'Size')
       || findByText('div[role="button"]', 'Size');
@@ -270,14 +367,11 @@
         log('Size selected:', size);
       } else {
         log('Size option not found:', size);
-        // Close the picker
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       }
       await sleep(300);
     } else {
-      // Try direct input field
-      const sizeInput = document.querySelector('input[name="size"]')
-        || document.querySelector('input[placeholder*="ize"]');
+      const sizeInput = queryFirst(FIELD_SELECTORS.size);
       if (sizeInput) {
         setNativeValue(sizeInput, size);
         log('Size set via input');
@@ -290,17 +384,15 @@
   async function fillBrand(brand) {
     if (!brand) return;
 
-    const brandInput = document.querySelector('input[data-testid="TextInput-listingBrand"]')
-      || document.querySelector('#listing-brand input')
-      || document.querySelector('input[placeholder*="rand"]')
-      || document.querySelector('input[name="brand"]');
-
+    const brandInput = queryFirst(FIELD_SELECTORS.brand);
     if (brandInput) {
       setNativeValue(brandInput, brand);
       await sleep(500);
 
-      // Poshmark shows a dropdown of brand suggestions — try to click the first match
-      const suggestion = await waitFor('.dropdown-menu li, [role="listbox"] [role="option"], .brand-search__results li', 2000);
+      const suggestion = await waitFor(
+        '.dropdown-menu li, [role="listbox"] [role="option"], .brand-search__results li',
+        2000
+      );
       if (suggestion) {
         click(suggestion);
         log('Brand selected from dropdown:', brand);
@@ -315,13 +407,11 @@
   async function fillColor(color) {
     if (!color) return;
 
-    // Poshmark uses color chips/buttons
     const colorEl = findByText('label, button, span, div[role="option"]', color);
     if (colorEl) {
       click(colorEl);
       log('Color selected:', color);
     } else {
-      // Try color input
       const colorInput = document.querySelector('input[name="color"]')
         || document.querySelector('input[placeholder*="olor"]');
       if (colorInput) {
@@ -335,8 +425,6 @@
 
   async function fillCondition(condition) {
     const mapped = mapCondition(condition);
-
-    // Condition labels on Poshmark
     const conditionLabels = {
       'nwt': 'NWT',
       'nwot': 'NWOT',
@@ -345,7 +433,6 @@
       'fair': 'Fair',
       'poor': 'Poor'
     };
-
     const label = conditionLabels[mapped] || 'Good';
     const condEl = findByText('label, button, span, div[role="option"], div[role="radio"]', label);
     if (condEl) {
@@ -356,37 +443,20 @@
     }
   }
 
-  async function fillOriginalPrice(originalPrice) {
-    if (!originalPrice) return;
-    const priceStr = String(originalPrice).replace(/[^0-9.]/g, '');
+  /**
+   * Fill a price field — strips non-numeric characters before setting.
+   */
+  async function fillPriceField(fieldName, value) {
+    if (!value) return;
+    const priceStr = String(value).replace(/[^0-9.]/g, '');
     if (!priceStr) return;
 
-    const input = document.querySelector('input[data-testid="TextInput-originalPrice"]')
-      || document.querySelector('input[name="originalPrice"]')
-      || document.querySelector('input[placeholder*="riginal"]')
-      || document.querySelector('input[placeholder*="MSRP"]');
-    if (input) {
-      setNativeValue(input, priceStr);
-      log('Original price set:', priceStr);
+    const el = queryFirst(FIELD_SELECTORS[fieldName]);
+    if (el) {
+      setNativeValue(el, priceStr);
+      log(`${fieldName} set:`, priceStr);
     } else {
-      log('Original price input not found');
-    }
-  }
-
-  async function fillListingPrice(price) {
-    if (!price) return;
-    const priceStr = String(price).replace(/[^0-9.]/g, '');
-    if (!priceStr) return;
-
-    const input = document.querySelector('input[data-testid="TextInput-listingPrice"]')
-      || document.querySelector('input[name="listingPrice"]')
-      || document.querySelector('input[placeholder*="isting"]')
-      || document.querySelector('input[placeholder*="rice"]');
-    if (input) {
-      setNativeValue(input, priceStr);
-      log('Listing price set:', priceStr);
-    } else {
-      log('Listing price input not found');
+      log(`${fieldName} input not found`);
     }
   }
 
@@ -394,16 +464,12 @@
     if (!styleTags || !Array.isArray(styleTags) || styleTags.length === 0) return;
 
     const tags = styleTags.slice(0, 3); // Poshmark allows up to 3
-
-    const tagInput = document.querySelector('input[data-testid="TextInput-styleTags"]')
-      || document.querySelector('input[placeholder*="tyle"]')
-      || document.querySelector('input[name="styleTags"]');
+    const tagInput = queryFirst(FIELD_SELECTORS.styleTags);
 
     if (tagInput) {
       for (const tag of tags) {
         setNativeValue(tagInput, tag);
         await sleep(300);
-        // Press Enter to confirm the tag
         tagInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
         tagInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
         await sleep(300);
@@ -422,30 +488,30 @@
       return;
     }
 
-    log(`Attempting to upload ${photoUrls.length} photos...`);
+    // Cap at Poshmark's maximum
+    const urls = photoUrls.slice(0, MAX_PHOTOS);
+    log(`Attempting to upload ${urls.length} photo(s) (max ${MAX_PHOTOS})...`);
 
-    // Find the file input on Poshmark's form
     const fileInput = document.querySelector('input[type="file"][accept*="image"]')
       || document.querySelector('input[type="file"]');
 
     if (!fileInput) {
       log('File input not found — showing photo URLs for manual upload');
-      showPhotoHelper(photoUrls);
+      showPhotoHelper(urls);
       return;
     }
 
     try {
-      // Download photos as blobs and create File objects
       const files = [];
-      for (let i = 0; i < photoUrls.length; i++) {
+      for (let i = 0; i < urls.length; i++) {
         try {
-          const response = await fetch(photoUrls[i]);
+          const response = await fetch(urls[i]);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
           const ext = blob.type.includes('png') ? 'png' : 'jpg';
           const file = new File([blob], `photo_${i + 1}.${ext}`, { type: blob.type });
           files.push(file);
-          log(`Downloaded photo ${i + 1}/${photoUrls.length}`);
+          log(`Downloaded photo ${i + 1}/${urls.length}`);
         } catch (err) {
           log(`Failed to download photo ${i + 1}:`, err.message);
         }
@@ -453,29 +519,32 @@
 
       if (files.length === 0) {
         log('No photos downloaded successfully');
-        showPhotoHelper(photoUrls);
+        showPhotoHelper(urls);
         return;
       }
 
-      // Create a DataTransfer to set the files on the input
+      // Inject files into the file input via DataTransfer
       const dt = new DataTransfer();
       files.forEach((f) => dt.items.add(f));
       fileInput.files = dt.files;
+
+      // Dispatch both change and input events for Vue compatibility
       fileInput.dispatchEvent(new Event('change', { bubbles: true }));
       fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-      log(`Uploaded ${files.length} photos via file input`);
+      log(`Uploaded ${files.length} photo(s) via file input`);
 
-      // Verify upload took effect
-      await sleep(1000);
-      // If Poshmark didn't pick them up, show fallback
-      const photoThumbs = document.querySelectorAll('.listing-editor__photo img, .photo-thumbnail, [data-testid*="photo"]');
+      // Verify upload
+      await sleep(1500);
+      const photoThumbs = document.querySelectorAll(
+        '.listing-editor__photo img, .photo-thumbnail, [data-testid*="photo"], .image-con img'
+      );
       if (photoThumbs.length === 0) {
         log('Photos may not have been accepted — showing fallback');
-        showPhotoHelper(photoUrls);
+        showPhotoHelper(urls);
       }
     } catch (err) {
       log('Photo upload failed:', err.message);
-      showPhotoHelper(photoUrls);
+      showPhotoHelper(urls);
     }
   }
 
@@ -494,10 +563,10 @@
     `;
     container.innerHTML = `
       <div style="font-weight:600; margin-bottom:8px; color:#7b2d8e;">
-        📷 Photos to Upload
+        Photos to Upload
       </div>
       <p style="font-size:12px; color:#666; margin-bottom:8px;">
-        Drag these images into the photo upload area, or right-click → Save and upload manually.
+        Drag these images into the photo upload area, or right-click and Save to upload manually.
       </p>
       <div id="stbf-photo-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
       <button id="stbf-photo-close" style="
@@ -522,9 +591,17 @@
     });
   }
 
-  // --- Notification Banner ---
+  // --- Notification / Error Banners ---
 
   function showNotification(message) {
+    showBanner(message, '#7b2d8e');
+  }
+
+  function showErrorBanner(message) {
+    showBanner(message, '#d32f2f');
+  }
+
+  function showBanner(message, bgColor) {
     const existing = document.getElementById('stbf-notification');
     if (existing) existing.remove();
 
@@ -532,32 +609,32 @@
     banner.id = 'stbf-notification';
     banner.style.cssText = `
       position: fixed; bottom: 20px; right: 20px; z-index: 100000;
-      background: #7b2d8e; color: white; padding: 12px 20px;
+      background: ${bgColor}; color: white; padding: 12px 20px;
       border-radius: 8px; font-family: sans-serif; font-size: 14px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-width: 350px;
-      animation: slideIn 0.3s ease-out;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-width: 400px;
+      animation: stbfSlideIn 0.3s ease-out;
     `;
     banner.textContent = message;
     document.body.appendChild(banner);
 
-    // Add animation style
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes slideIn {
-        from { transform: translateY(20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-      }
-    `;
-    document.head.appendChild(style);
+    if (!document.getElementById('stbf-anim-style')) {
+      const style = document.createElement('style');
+      style.id = 'stbf-anim-style';
+      style.textContent = `
+        @keyframes stbfSlideIn {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
-    setTimeout(() => banner.remove(), 10000);
+    setTimeout(() => banner.remove(), 12000);
   }
 
   // --- Listing Completion Detection ---
 
   function watchForListingCompletion(itemId) {
-    // After the user submits, Poshmark redirects to /listing/<id>
-    // Watch for URL changes
     let lastUrl = location.href;
 
     const observer = new MutationObserver(() => {
@@ -568,24 +645,19 @@
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
-
-    // Also check on popstate / navigation
     window.addEventListener('popstate', () => checkForListingId(itemId));
 
-    // Periodically check URL as fallback
     const interval = setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
         checkForListingId(itemId);
       }
-      // Stop checking after 30 minutes
     }, 2000);
 
     setTimeout(() => clearInterval(interval), 30 * 60 * 1000);
   }
 
   function checkForListingId(itemId) {
-    // Poshmark listing URLs look like: /listing/<title-slug>-<hexId>
     const match = location.pathname.match(/^\/listing\/(.+)-([0-9a-f]{24})$/i);
     if (match) {
       const poshmarkListingId = match[2];
@@ -610,7 +682,6 @@
   // --- Entry Point ---
 
   async function init() {
-    // Check for pending item data
     const data = await chrome.storage.local.get(['poshmark_pending_item', 'poshmark_pending_item_id']);
     const item = data.poshmark_pending_item;
     const itemId = data.poshmark_pending_item_id;
@@ -625,19 +696,19 @@
     // Start watching for listing completion
     watchForListingCompletion(itemId);
 
-    // Wait for the form to be ready
-    const formReady = await waitFor(
-      'input[data-testid="TextInput-listingTitle"], #listing-title input, input[name="title"], input[placeholder*="itle"]',
-      10000
-    );
+    // Wait for the form to appear using all known selectors
+    const formReady = await waitForAny(FORM_DETECTION_SELECTORS, 10000);
 
     if (!formReady) {
-      log('Listing form not found after waiting. User may need to navigate to create-listing page.');
-      showNotification('STBF item loaded but form not detected. Make sure you are on the create listing page.');
+      log('Listing form not found after waiting.');
+      showErrorBanner(
+        'STBF: Could not detect the Poshmark listing form. ' +
+        'Please navigate to the "Create Listing" page (poshmark.com/create-listing) and try again.'
+      );
       return;
     }
 
-    // Fill the form
+    log('Form detected, filling...');
     await fillListingForm(item);
   }
 
@@ -645,8 +716,7 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    // Small delay to let Poshmark's SPA render
-    setTimeout(init, 1500);
+    setTimeout(init, 500);
   }
 
   log('Content script loaded on Poshmark');
