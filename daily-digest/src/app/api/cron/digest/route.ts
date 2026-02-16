@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { compileAndSendDigest } from '@/lib/digest-engine';
-import { getEnabledAutomations, ensureDatabase } from '@/lib/db';
+import { getEnabledAutomations, getLastDigestTimestamp, ensureDatabase } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   // Verify the request is from Vercel Cron
@@ -34,6 +34,22 @@ export async function GET(req: NextRequest) {
         reason: `Not delivery time. Current: ${currentHour}:${String(currentMinute).padStart(2, '0')} ET, Target: ${automation.delivery_time} ET`,
       });
       continue;
+    }
+
+    // Guard against duplicate sends — skip if already sent in the last 2 hours
+    const lastSent = await getLastDigestTimestamp(automation.id);
+    if (lastSent) {
+      const msSinceLastSend = Date.now() - lastSent.getTime();
+      const twoHoursMs = 2 * 60 * 60 * 1000;
+      if (msSinceLastSend < twoHoursMs) {
+        results.push({
+          automationId: automation.id,
+          name: automation.name,
+          skipped: true,
+          reason: `Already sent ${Math.round(msSinceLastSend / 60000)} minutes ago`,
+        });
+        continue;
+      }
     }
 
     try {
