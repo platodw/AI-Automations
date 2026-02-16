@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const targetMinutes = targetHour * 60 + targetMinute;
     const diff = Math.abs(currentMinutes - targetMinutes);
 
-    if (diff > 15) {
+    if (diff > 60) {
       results.push({
         automationId: automation.id,
         name: automation.name,
