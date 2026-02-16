@@ -22,13 +22,22 @@ interface SectionResult {
   executionTimeMs: number;
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 async function fetchSection(
   key: string,
   fetcher: () => Promise<any>
 ): Promise<SectionResult> {
   const start = Date.now();
   try {
-    const data = await fetcher();
+    const data = await withTimeout(fetcher(), 15000, key);
     return {
       key,
       data,
@@ -121,80 +130,89 @@ export async function compileAndSendDigest(automation: Automation): Promise<{
     }
   }
 
-  // AI-summarize emails and add action items to Notion
+  // AI-summarize all sections in parallel to stay within 60s function limit
+  const aiTasks: Promise<void>[] = [];
+
   if (content.emails && !errors.emails) {
-    try {
-      const allEmails = [];
-      for (const result of content.emails.raw || []) {
-        for (const email of result.emails || []) {
-          allEmails.push({
-            from: email.from,
-            subject: email.subject,
-            body: email.body || email.snippet || '',
-            date: email.date,
-            account: result.account,
-          });
-        }
-      }
-
-      if (allEmails.length > 0) {
-        const summary = await summarizeEmails(allEmails);
-        content.emails.aiSummary = summary;
-
-        // Add action items to Notion
-        if (summary.actionItems.length > 0) {
-          try {
-            const added = await addActionItems(
-              summary.actionItems.map((item) => ({ title: item, category: 'Personal' }))
-            );
-            content.emails.notionItemsAdded = added;
-            console.log(`[Digest] Added ${added} action items to Notion`);
-          } catch (notionErr) {
-            console.error('[Digest] Notion action items failed:', notionErr);
+    aiTasks.push((async () => {
+      try {
+        const allEmails = [];
+        for (const result of content.emails.raw || []) {
+          for (const email of result.emails || []) {
+            allEmails.push({
+              from: email.from,
+              subject: email.subject,
+              body: email.body || email.snippet || '',
+              date: email.date,
+              account: result.account,
+            });
           }
         }
+
+        if (allEmails.length > 0) {
+          const summary = await withTimeout(summarizeEmails(allEmails), 25000, 'emailSummary');
+          content.emails.aiSummary = summary;
+
+          // Add action items to Notion
+          if (summary.actionItems.length > 0) {
+            try {
+              const added = await addActionItems(
+                summary.actionItems.map((item) => ({ title: item, category: 'Personal' }))
+              );
+              content.emails.notionItemsAdded = added;
+              console.log(`[Digest] Added ${added} action items to Notion`);
+            } catch (notionErr) {
+              console.error('[Digest] Notion action items failed:', notionErr);
+            }
+          }
+        }
+      } catch (aiErr) {
+        console.error('[Digest] Email AI summarization failed:', aiErr);
+        errors.emailSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
       }
-    } catch (aiErr) {
-      console.error('[Digest] Email AI summarization failed:', aiErr);
-      errors.emailSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
-    }
+    })());
   }
 
-  // AI-summarize sports
   if (content.sports && !errors.sports) {
-    try {
-      const sportsSummary = await summarizeSports(content.sports);
-      content.sports.aiSummary = sportsSummary;
-      console.log(`[Digest] AI sports summary generated for ${sportsSummary.teamSummaries.length} teams`);
-    } catch (aiErr) {
-      console.error('[Digest] Sports AI summarization failed:', aiErr);
-      errors.sportsSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
-    }
+    aiTasks.push((async () => {
+      try {
+        const sportsSummary = await withTimeout(summarizeSports(content.sports), 25000, 'sportsSummary');
+        content.sports.aiSummary = sportsSummary;
+        console.log(`[Digest] AI sports summary generated for ${sportsSummary.teamSummaries.length} teams`);
+      } catch (aiErr) {
+        console.error('[Digest] Sports AI summarization failed:', aiErr);
+        errors.sportsSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+      }
+    })());
   }
 
-  // AI-summarize Reddit
   if (content.reddit && !errors.reddit) {
-    try {
-      const redditSummary = await summarizeReddit(content.reddit);
-      content.reddit.aiSummary = redditSummary;
-      console.log(`[Digest] AI Reddit summary generated for ${redditSummary.subredditSummaries.length} subreddits`);
-    } catch (aiErr) {
-      console.error('[Digest] Reddit AI summarization failed:', aiErr);
-      errors.redditSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
-    }
+    aiTasks.push((async () => {
+      try {
+        const redditSummary = await withTimeout(summarizeReddit(content.reddit), 25000, 'redditSummary');
+        content.reddit.aiSummary = redditSummary;
+        console.log(`[Digest] AI Reddit summary generated for ${redditSummary.subredditSummaries.length} subreddits`);
+      } catch (aiErr) {
+        console.error('[Digest] Reddit AI summarization failed:', aiErr);
+        errors.redditSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+      }
+    })());
   }
 
-  // AI-summarize Calendar
   if (content.calendar && !errors.calendar) {
-    try {
-      const calendarSummary = await summarizeCalendar(content.calendar);
-      content.calendar.aiSummary = calendarSummary;
-      console.log('[Digest] AI calendar summary generated');
-    } catch (aiErr) {
-      console.error('[Digest] Calendar AI summarization failed:', aiErr);
-      errors.calendarSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
-    }
+    aiTasks.push((async () => {
+      try {
+        const calendarSummary = await withTimeout(summarizeCalendar(content.calendar), 25000, 'calendarSummary');
+        content.calendar.aiSummary = calendarSummary;
+        console.log('[Digest] AI calendar summary generated');
+      } catch (aiErr) {
+        console.error('[Digest] Calendar AI summarization failed:', aiErr);
+        errors.calendarSummary = aiErr instanceof Error ? aiErr.message : String(aiErr);
+      }
+    })());
   }
+
+  await Promise.allSettled(aiTasks);
 
   content.errors = errors;
   content.generatedAt = new Date().toISOString();
@@ -272,55 +290,64 @@ export async function previewDigest(automation: Automation): Promise<{ html: str
 
   await Promise.allSettled(promises);
 
-  // AI-summarize emails
+  // AI-summarize all sections in parallel to stay within 60s function limit
+  const aiTasks: Promise<void>[] = [];
+
   if (content.emails && !errors.emails) {
-    try {
-      const allEmails: any[] = [];
-      for (const result of content.emails.raw || []) {
-        for (const email of result.emails || []) {
-          allEmails.push({
-            from: email.from,
-            subject: email.subject,
-            body: email.body || email.snippet || '',
-            date: email.date,
-            account: result.account,
-          });
+    aiTasks.push((async () => {
+      try {
+        const allEmails: any[] = [];
+        for (const result of content.emails.raw || []) {
+          for (const email of result.emails || []) {
+            allEmails.push({
+              from: email.from,
+              subject: email.subject,
+              body: email.body || email.snippet || '',
+              date: email.date,
+              account: result.account,
+            });
+          }
         }
+        if (allEmails.length > 0) {
+          content.emails.aiSummary = await withTimeout(summarizeEmails(allEmails), 25000, 'emailSummary');
+        }
+      } catch (e) {
+        console.error('[Preview] Email AI summarization failed:', e);
       }
-      if (allEmails.length > 0) {
-        content.emails.aiSummary = await summarizeEmails(allEmails);
-      }
-    } catch (e) {
-      console.error('[Preview] Email AI summarization failed:', e);
-    }
+    })());
   }
 
-  // AI-summarize sports
   if (content.sports && !errors.sports) {
-    try {
-      content.sports.aiSummary = await summarizeSports(content.sports);
-    } catch (e) {
-      console.error('[Preview] Sports AI summarization failed:', e);
-    }
+    aiTasks.push((async () => {
+      try {
+        content.sports.aiSummary = await withTimeout(summarizeSports(content.sports), 25000, 'sportsSummary');
+      } catch (e) {
+        console.error('[Preview] Sports AI summarization failed:', e);
+      }
+    })());
   }
 
-  // AI-summarize Reddit
   if (content.reddit && !errors.reddit) {
-    try {
-      content.reddit.aiSummary = await summarizeReddit(content.reddit);
-    } catch (e) {
-      console.error('[Preview] Reddit AI summarization failed:', e);
-    }
+    aiTasks.push((async () => {
+      try {
+        content.reddit.aiSummary = await withTimeout(summarizeReddit(content.reddit), 25000, 'redditSummary');
+      } catch (e) {
+        console.error('[Preview] Reddit AI summarization failed:', e);
+      }
+    })());
   }
 
-  // AI-summarize Calendar
   if (content.calendar && !errors.calendar) {
-    try {
-      content.calendar.aiSummary = await summarizeCalendar(content.calendar);
-    } catch (e) {
-      console.error('[Preview] Calendar AI summarization failed:', e);
-    }
+    aiTasks.push((async () => {
+      try {
+        content.calendar.aiSummary = await withTimeout(summarizeCalendar(content.calendar), 25000, 'calendarSummary');
+      } catch (e) {
+        console.error('[Preview] Calendar AI summarization failed:', e);
+      }
+    })());
   }
+
+  await Promise.allSettled(aiTasks);
 
   content.errors = errors;
 
