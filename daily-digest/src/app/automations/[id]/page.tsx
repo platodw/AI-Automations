@@ -118,11 +118,12 @@ export default function AutomationDetailPage() {
     setError(null);
     try {
       const res = await fetch(`/api/digest?automationId=${id}`);
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.html) {
         setPreviewHtml(data.html);
       } else {
-        setError('Failed to load preview.');
+        const detail = data?.error || `HTTP ${res.status}`;
+        setError(`Failed to load preview: ${detail}`);
       }
     } catch {
       setError('Failed to connect.');
